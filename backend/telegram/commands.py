@@ -28,10 +28,12 @@ from backend.presenters.formatters import (
 from backend.backtest.service import latest_report
 from backend.presenters.backtest import format_backtest_report
 from backend.presenters.messages import MessageBuilder
-from backend.presenters.price_check import format_price_check
+from backend.presenters.formatters import min_odds
+from backend.presenters.price_check import MAX_ODDS, MIN_ODDS, format_bookmaker_stats, format_price_check, price_value
 from backend.presenters.results import format_track_record
 from backend.services.overview import build_daily_overview
 from backend.services.picks import get_match_analysis
+from backend.services.price_checks import bookmaker_stats, record_check
 from backend.services.results import track_record
 from backend.services.system_status import collect_status
 from backend.services.users import register_user
@@ -78,16 +80,20 @@ def authorization_reply(container: AppContainer, chat_id: int) -> MessageBuilder
     return None
 
 
-def price_check_message(container: AppContainer, args: list[str]) -> MessageBuilder:
-    """/misli_12 1.45 — is the price at the user's bookmaker worth taking?"""
+def price_check_message(container: AppContainer, args: list[str], chat_id: int | None = None) -> MessageBuilder:
+    """/misli_12 1.45 — is the price at the user's bookmaker worth taking? /misli — what the checks show."""
+    bookmaker = container.config.selection.user_bookmaker or "Misli.az"
     match_id = next((int(a) for a in args if a.isdigit()), None)
     odds = next((_parse_odds(a) for a in args if not a.isdigit() and _parse_odds(a) is not None), None)
     if match_id is None:
-        return text_message(t("price.usage"))
-    bookmaker = container.config.selection.user_bookmaker or "Misli.az"
+        return format_bookmaker_stats(bookmaker_stats(container.db, bookmaker))
     view = get_match_analysis(container.db, match_id, container.tz)
     state = container.pyramid_service().get_state()
-    return format_price_check(view, odds, bookmaker, state)
+    message = format_price_check(view, odds, bookmaker, state)
+    valid = view is not None and view.has_candidate and view.p_final and odds is not None
+    if valid and MIN_ODDS <= odds <= MAX_ODDS:
+        record_check(container.db, view, odds, bookmaker, price_value(view, odds), min_odds(view), chat_id)
+    return message
 
 
 def _parse_odds(text: str) -> float | None:
@@ -105,6 +111,9 @@ def track_record_message(container: AppContainer) -> MessageBuilder:
         track_record(container.db, since=today - timedelta(days=30)),
         container.pyramid_service().get_state(),
         latest_report(container.db),
+        bookmaker_stats(container.db, container.config.selection.user_bookmaker)
+        if container.config.selection.user_bookmaker
+        else None,
     )
 
 
@@ -137,7 +146,7 @@ async def respond(container: AppContainer, runner: PipelineRunner, incoming: Inc
         state = await asyncio.to_thread(service.get_state)
         return format_pyramid(state, service.projection(state), paper_mode=container.settings.paper_mode)
     if command == "misli":
-        return await asyncio.to_thread(price_check_message, container, args)
+        return await asyncio.to_thread(price_check_message, container, args, incoming.chat_id)
     if command == "neticeler":
         return await asyncio.to_thread(track_record_message, container)
     if command == "backtest":

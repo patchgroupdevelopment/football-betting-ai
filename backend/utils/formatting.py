@@ -75,3 +75,8 @@ def confidence_band(score: float) -> str:
         if score >= threshold:
             return label
     return CONFIDENCE_BANDS[-1][1]
+
+
+def az_upper(text: str) -> str:
+    """Upper case with Azerbaijani dotted/dotless i: 'Misli' -> 'MİSLİ', 'ı' -> 'I'."""
+    return text.replace("i", "İ").replace("ı", "I").upper()

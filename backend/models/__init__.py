@@ -1,6 +1,6 @@
 """ORM models. Importing this package registers every table on ``Base.metadata``."""
 
-from backend.models.betting import Bet, Prediction, PyramidStage
+from backend.models.betting import Bet, Prediction, PriceCheck, PyramidStage
 from backend.models.football import (
     Injury,
     League,
@@ -34,6 +34,7 @@ __all__ = [
     "Player",
     "PlayerMatchStats",
     "Prediction",
+    "PriceCheck",
     "PyramidStage",
     "Result",
     "ScorerStat",

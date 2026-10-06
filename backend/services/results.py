@@ -55,7 +55,7 @@ class SettlementReport:
     pyramid: PyramidState | None = None
 
 
-def _final_score(match: Match, result: Result | None) -> FinalScore:
+def final_score(match: Match, result: Result | None) -> FinalScore:
     return FinalScore(
         home=match.home_goals or 0,
         away=match.away_goals or 0,
@@ -108,7 +108,7 @@ class ResultsService:
         outcome: Outcome | None = None
         if match.status in FINISHED_STATUSES and match.home_goals is not None and match.away_goals is not None:
             result = session.scalar(select(Result).where(Result.match_id == match.id))
-            outcome = settle(prediction.market, prediction.selection, prediction.line, _final_score(match, result))
+            outcome = settle(prediction.market, prediction.selection, prediction.line, final_score(match, result))
         if outcome is None:
             stale = now - match.kickoff_utc > VOID_AFTER
             if not (match.status in CANCELLED_STATUSES or (stale and match.status in FINISHED_STATUSES)):

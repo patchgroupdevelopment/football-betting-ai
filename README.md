@@ -85,6 +85,8 @@ Yenidən kalibrləmə: `python -m backend.cli backtest --sweep` (yalnız göstə
 (X = sistemin yekun ehtimalına görə ədalətli əmsal). Misli-dəki əmsalı Telegram-da yoxlayın: `/misli_12 1.45` — sistem həmin əmsalla
 dəyəri hesablayıb ✅ və ya ⛔ deyir. Backtestdə adi bukmekerin əmsalı 127 seçimin yalnız 2-sində ədalətli qiymətə çatıb, yəni
 Misli-də ✅ nadir olacaq. ⛔ olan mərclər uzun müddətdə bukmekerin marjası qədər zərər gətirir.
+Hər yoxlama bazada saxlanılır: `/misli` (və veb paneldə "Nəticələr") Misli əmsallarının ədalətli qiymətdən orta fərqini
+(təxminən Misli-nin marjası) və ✅ keçən seçimlərin Misli əmsalı ilə real nəticəsini göstərir.
 
 VS Code-da: **Run and Debug** → "Sistemi işə sal".
 
@@ -118,6 +120,7 @@ Sistem GitHub-ın pulsuz serverlərində işləyir, kompüterin açıq olması l
 | `/neticeler` | Seçimlərin canlı nəticələri: qazanma faizi, ROI, CLV, son 30 gün, piramida |
 | `/backtest` | Son backtestin qısa hesabatı və piramida simulyasiyası |
 | `/misli_ID 1.45` | Misli.az-dakı əmsalı yoxla: bu əmsalla mərc dəyərlidirmi? (✅ / ⛔) |
+| `/misli` | Misli.az yoxlamalarının statistikası: əmsallar ədalətli qiymətdən neçə % fərqlənir, ✅ olanların nəticəsi |
 | `/status` | Sistem vəziyyəti, API limiti, növbəti yükləmə |
 | `/yenile` | Məlumatları indi yüklə |
 | `/komek` | Əmrlərin siyahısı |

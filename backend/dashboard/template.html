@@ -241,6 +241,17 @@ footer { margin-top: 36px; color: var(--muted); font-size: 12px; border-top: 1px
     var r = D.results;
     root.appendChild(el("h2", { text: L.live_record }));
     root.appendChild(el("div", { class: "grid cards" }, recordKpis(L.all_picks, r.overall), recordKpis(L.top_only, r.top), recordKpis(L.last_30, r.recent)));
+    if (D.prices) {
+      var pc = D.prices;
+      root.appendChild(el("h2", { text: L.price_checks.replace("{bookmaker}", pc.bookmaker) }));
+      if (!pc.checks) root.appendChild(el("div", { class: "notice", text: L.price_checks_empty }));
+      else root.appendChild(el("div", { class: "grid kpis" },
+        kpi(L.checks, String(pc.checks), L.passed + ": " + pc.passed),
+        kpi(L.gap_fair, pct(pc.gap_fair, true), null, cls(pc.gap_fair)),
+        kpi(L.gap_best, pct(pc.gap_best, true), null, cls(pc.gap_best)),
+        kpi(L.passed_roi, pct(pc.passed_roi, true), pc.passed_bets + " " + L.bets.toLowerCase(), cls(pc.passed_roi)),
+        kpi(L.all_roi, pct(pc.all_roi, true), pc.all_bets + " " + L.bets.toLowerCase(), cls(pc.all_roi))));
+    }
     if (r.equity.length > 1) { root.appendChild(el("h2", { text: L.equity })); root.appendChild(lineChart(r.equity, L.profit)); }
     root.appendChild(el("h2", { text: L.settled }));
     root.appendChild(table([

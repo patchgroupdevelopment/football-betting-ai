@@ -21,6 +21,7 @@ from backend.models.constants import BetStatus, Decision
 from backend.presenters.formatters import min_odds
 from backend.presenters.labels import reasons_text, selection_label
 from backend.services.picks import PickView, day_predictions
+from backend.services.price_checks import bookmaker_stats
 from backend.services.pyramid import PyramidService
 from backend.services.results import TrackRecord, track_record
 from backend.services.runs import RUN_KIND_ANALYSIS, RUN_KIND_DAILY
@@ -145,6 +146,24 @@ def _results(db: Database, day: date, tz: ZoneInfo) -> dict[str, Any]:
     }
 
 
+def _prices(db: Database, config: AppConfig) -> dict[str, Any] | None:
+    bookmaker = config.selection.user_bookmaker
+    if not bookmaker:
+        return None
+    stats = bookmaker_stats(db, bookmaker)
+    return {
+        "bookmaker": bookmaker,
+        "checks": stats.checks,
+        "passed": stats.passed,
+        "gap_fair": _pct(stats.gap_to_fair),
+        "gap_best": _pct(stats.gap_to_best),
+        "passed_roi": _pct(stats.passed_results.roi),
+        "passed_bets": stats.passed_results.bets,
+        "all_roi": _pct(stats.all_results.roi),
+        "all_bets": stats.all_results.bets,
+    }
+
+
 def _pyramid(db: Database, config: AppConfig) -> dict[str, Any]:
     service = PyramidService(db, config.bankroll)
     state = service.get_state()
@@ -219,6 +238,7 @@ def collect(db: Database, config: AppConfig, tz: ZoneInfo, day: date, *, paper_m
         "user_bookmaker": config.selection.user_bookmaker,
         "today": _today(db, day, tz),
         "results": _results(db, day, tz),
+        "prices": _prices(db, config),
         "pyramid": _pyramid(db, config),
         "backtest": _backtest(db),
         "system": _system(db, tz),

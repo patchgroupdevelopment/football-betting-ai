@@ -6,6 +6,7 @@ from backend.i18n import t
 from backend.models.constants import BetStatus, StageStatus
 from backend.presenters.labels import selection_label
 from backend.presenters.messages import MessageBuilder, bold
+from backend.services.price_checks import BookmakerStats
 from backend.services.pyramid import PyramidState
 from backend.services.results import SettlementReport, TrackRecord
 from backend.utils.formatting import format_money, format_odds, format_percent, format_signed_percent
@@ -75,6 +76,7 @@ def format_track_record(
     recent: TrackRecord,
     state: PyramidState,
     backtest: dict | None,
+    prices: BookmakerStats | None = None,
 ) -> MessageBuilder:
     msg = MessageBuilder()
     msg.line(bold(t("results.stats_title")))
@@ -95,6 +97,16 @@ def format_track_record(
             locked=format_money(state.locked_total),
         )
     )
+    if prices is not None and prices.checks:
+        msg.line(
+            t(
+                "results.price_line",
+                bookmaker=prices.bookmaker,
+                checks=prices.checks,
+                gap=format_signed_percent(prices.gap_to_fair, 1) if prices.gap_to_fair is not None else "—",
+                passed=prices.passed,
+            )
+        )
     if backtest and backtest.get("summary", {}).get("bets"):
         s = backtest["summary"]
         msg.section()

@@ -7,6 +7,7 @@ import json
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import pytest
 from sqlalchemy import select
 
 from backend.config import BankrollConfig, Settings
@@ -203,3 +204,30 @@ def test_pick_card_shows_the_minimum_price_at_the_users_bookmaker(db, app_config
     text = format_match_detail(view, user_bookmaker="Misli.az").render_plain()
     assert "Misli.az-da əmsal ən azı 1.43" in text and f"/misli_{ids['tonight_match']}" in text
     assert "Misli" not in format_match_detail(view).render_plain()
+
+
+def test_price_checks_are_stored_and_summarised(db, app_config):
+    from backend.services.price_checks import bookmaker_stats
+
+    ids = _seed(db)
+    config = app_config.model_copy(
+        update={"selection": app_config.selection.model_copy(update={"user_bookmaker": "Misli.az"})}
+    )
+    container = _container(db, config)
+    played, tonight = ids["played_match"], ids["tonight_match"]
+    _reply(container, f"/misli_{played} 1.30")  # below the minimum (1.43): ⛔
+    _reply(container, f"/misli_{tonight} 1.40")  # first look ...
+    _reply(container, f"/misli_{tonight} 1.50")  # ... the latest check of a pick counts: ✅
+
+    stats = bookmaker_stats(db, "Misli.az")
+    assert (stats.checks, stats.passed) == (2, 1)
+    assert stats.gap_to_fair == pytest.approx(((1.30 / 1.43 - 1) + (1.50 / 1.43 - 1)) / 2)
+    # Only the played match is settled: 2:0, home win at 1.30 → +0.30
+    assert stats.all_results.bets == 1 and stats.all_results.profit == pytest.approx(0.30)
+    assert stats.passed_results.bets == 0
+
+    text = _reply(container, "/misli")
+    assert "MİSLİ.AZ YOXLAMALARI" in text and "Yoxlanan seçim: 2" in text
+    assert "Misli.az: 2 yoxlama" in _reply(container, "/neticeler")
+    data = collect(db, config, TZ, DAY, paper_mode=True)
+    assert data["prices"]["checks"] == 2

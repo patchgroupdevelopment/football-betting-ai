@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, Date, ForeignKey, String
+from sqlalchemy import JSON, BigInteger, Date, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -79,3 +79,27 @@ class PyramidStage(Base):
     status: Mapped[str] = mapped_column(String(8), default="pending")  # StageStatus
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     settled_at: Mapped[datetime | None]
+
+
+class PriceCheck(Base):
+    """A price the user found at their own bookmaker for one of the system's picks (/misli_ID 1.45).
+
+    Collected over time, the checks show how far that bookmaker's prices sit from the market's fair price
+    and how the picks that passed the check actually ended.
+    """
+
+    __tablename__ = "price_checks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    prediction_id: Mapped[int] = mapped_column(ForeignKey("predictions.id"), index=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    bookmaker: Mapped[str] = mapped_column(String(40))
+    odds: Mapped[float]  # the user's price
+    min_odds: Mapped[float | None]  # lowest price with non-negative value, at the time of the check
+    best_odds: Mapped[float | None]  # best market price at the time of the check
+    p_final: Mapped[float | None]
+    ev: Mapped[float]
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    prediction: Mapped[Prediction] = relationship()
