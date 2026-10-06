@@ -1,0 +1,137 @@
+# =============================================================
+# Futbol Analiz Sistemi — dəyişdirilə bilən parametrlər
+# Gizli açarlar burada YOX, .env faylında saxlanılır.
+# .env-də eyni parametr (məs. MIN_ODDS) doldurulubsa, o üstündür.
+# =============================================================
+
+bankroll:
+  starting: 2.0                       # başlanğıc balans (AZN)
+  target: 10000.0                     # hədəf balans (AZN)
+  mode: classic                       # classic | milestone_lock (qazanc kilidi)
+  milestones: [50, 250, 1000, 5000]   # qazanc kilidi mərhələləri (AZN)
+  lock_fraction: 0.5                  # mərhələ keçiləndə balansın kilidlənən payı
+  projection_odds: 1.50               # piramida proqnozu üçün nümunə əmsal
+  assumed_ev: 0.05                    # nəzəri ehtimal hesabı üçün fərziyyə (+5%)
+
+selection:
+  min_odds: 1.20
+  max_odds: 1.70
+  min_confidence: 75
+  min_ev: 0.03                        # minimum dəyər üstünlüyü (EV)
+  max_daily_picks: 3
+  allow_combos: false                 # ekspress (kombinasiya) mərcləri
+  watch_margin: 10                    # əminlik həddən bu qədər aşağıdırsa — "İZLƏMƏDƏ SAXLA"
+  # Analiz olunan marketlər. Silinən market heç vaxt təklif olunmur.
+  markets: [1X2, DC, DNB, OU, OU_1H, BTTS, TEAM_TOTAL_HOME, TEAM_TOTAL_AWAY, AH, CORNERS_OU, CARDS_OU]
+
+# Əminlik səviyyəsinin çəkiləri — cəmi 1.00 olmalıdır
+confidence_weights:
+  form: 0.20                          # forma
+  home_away: 0.15                     # ev/səfər
+  xg: 0.15
+  injuries: 0.15                      # zədə/cəza
+  strength: 0.10                      # komandanın gücü
+  h2h: 0.05                           # son qarşılaşmalar
+  motivation: 0.10                    # motivasiya
+  fatigue: 0.05                       # yorğunluq
+  market: 0.05                        # bazar dəyəri
+
+model:
+  market_blend_weight: 0.4            # yekun ehtimalda modelin payı (qalanı bazar)
+  llm_max_adjustment_pp: 4            # LLM-in ehtimalı dəyişə biləcəyi maksimum faiz bəndi
+  elo_weight: 0.25                    # 1X2 tipli marketlərdə Elo-nun payı (qalanı Dixon-Coles)
+  xg_weight: 0.6                      # komanda gücündə xG-nin payı (qalanı faktiki qollar)
+  half_life_days: 180                 # köhnə oyunların çəkisinin yarıya düşmə müddəti
+  prior_matches: 3                    # az məlumatlı komandanı orta səviyyəyə yaxınlaşdıran virtual oyunlar
+  fit_window_days: 540                # model neçə günlük oyunlar üzərində qurulur
+  max_contradiction_pp: 15            # model ilə bazar arasında icazə verilən maksimum fərq (f.b.)
+  corners_dispersion: 1.25            # künclərin dağılması (1.0 = Poisson)
+  cards_dispersion: 1.35              # kartların dağılması
+  replacement_factor: 0.5             # itirilən oyunçunun töhfəsinin nə qədəri itir (qalanını əvəzedici verir)
+  max_injury_attack_loss: 0.20        # zədələrə görə hücumun maksimum zəifləməsi
+  max_injury_defence_gain: 0.15       # zədələrə görə buraxılan qolların maksimum artımı
+  fatigue_penalty: 0.03               # qısa istirahətdə hücuma tətbiq olunan cərimə
+  short_rest_days: 3                  # bu qədər və ya az istirahət "qısa" sayılır
+  motivation_max_effect: 0.03         # motivasiyanın qol gözləntisinə maksimum təsiri
+  version: dc-elo-v1                  # model versiyası (proqnozlarla birlikdə saxlanılır)
+
+lineup_monitoring: true
+
+ingestion:
+  history_depth: 20                   # hər komanda üçün yüklənən son oyun sayı
+  include_other_leagues: false        # siyahıda olmayan liqaları da ətraflı yüklə
+  max_deep_matches: 60                # gündə ətraflı yüklənən maksimum oyun sayı
+
+api_football:
+  base_url: https://v3.football.api-sports.io
+  requests_per_minute: 10             # Pulsuz plan: 10, Pro: 300
+  daily_reserve: 5                    # gündəlik limitdən ehtiyatda saxlanan sorğu sayı
+  timeout_seconds: 20
+  max_retries: 3
+
+cache_ttl_seconds:
+  fixtures: 21600                     # 6 saat
+  standings: 21600                    # 6 saat
+  team_history: 43200                 # 12 saat
+  injuries: 7200                      # 2 saat
+  odds: 600                           # 10 dəqiqə
+  lineups: 120                        # 2 dəqiqə
+  h2h: 86400                          # 24 saat
+
+schedule:
+  daily_pipeline: "08:00"             # səhər yükləmə və hesabat
+  second_run: "15:00"                 # axşam oyunları üçün yeniləmə
+  cache_cleanup: "03:00"
+  catch_up_on_start: true             # sistem gec işə düşsə, bugünkü yükləməni dərhal et
+
+# Pulsuz tarixçə mənbələri (API-Football-un pulsuz planı keçmiş oyunları vermir)
+external_data:
+  enabled: true
+  cache_hours: 12                     # CSV və cədvəllər bu müddətdə yenidən yüklənmir
+  name_match_threshold: 0.84          # mənbələr arasında komanda adlarının uyğunluq həddi
+  football_data_org:
+    requests_per_minute: 10           # pulsuz planın limiti
+  football_data_couk:
+    seasons_back: 1                   # cari mövsümdən əlavə neçə keçmiş mövsüm yüklənsin
+
+# Liqalar prioritet sırası ilə (yuxarıdakı daha vacibdir).
+# ID-ləri yoxlamaq üçün:
+#   python -m backend.cli leagues --check
+#   python -m backend.cli leagues --country Azerbaijan
+# country — API-dəki ölkə adı (ingiliscə). ID səhvdirsə, yükləmə xəbərdarlıq verir.
+# fd_couk — football-data.co.uk kodu (nəticələr, xG, zərbə, künc, kart); "new:XXX" — əlavə liqalar faylı
+# fd_org  — football-data.org kodu (turnir cədvəli, bombardirlər, nəticələr)
+leagues:
+  # 1-ci səviyyə — prioritet liqalar
+  - { api_id: 2,   name_az: "UEFA Çempionlar Liqası",          tier: 1, country: World, fd_org: CL }
+  - { api_id: 3,   name_az: "UEFA Avropa Liqası",              tier: 1, country: World }
+  - { api_id: 848, name_az: "UEFA Konfrans Liqası",            tier: 1, country: World }
+  - { api_id: 39,  name_az: "İngiltərə — Premyer Liqa",        tier: 1, country: England, fd_couk: E0, fd_org: PL }
+  - { api_id: 140, name_az: "İspaniya — La Liqa",              tier: 1, country: Spain, fd_couk: SP1, fd_org: PD }
+  - { api_id: 135, name_az: "İtaliya — Seriya A",              tier: 1, country: Italy, fd_couk: I1, fd_org: SA }
+  - { api_id: 78,  name_az: "Almaniya — Bundesliqa",           tier: 1, country: Germany, fd_couk: D1, fd_org: BL1 }
+  - { api_id: 61,  name_az: "Fransa — Liqa 1",                 tier: 1, country: France, fd_couk: F1, fd_org: FL1 }
+  - { api_id: 88,  name_az: "Niderland — Eredivizi",           tier: 1, country: Netherlands, fd_couk: N1, fd_org: DED }
+  - { api_id: 94,  name_az: "Portuqaliya — Primeyra Liqa",     tier: 1, country: Portugal, fd_couk: P1, fd_org: PPL }
+  - { api_id: 203, name_az: "Türkiyə — Super Liqa",            tier: 1, fd_couk: T1 }
+  - { api_id: 71,  name_az: "Braziliya — Seriya A",            tier: 1, country: Brazil, fd_couk: "new:BRA", fd_org: BSA }
+  - { api_id: 253, name_az: "ABŞ — MLS",                       tier: 1, country: USA, fd_couk: "new:USA" }
+  # 2-ci səviyyə — digər əsas liqalar
+  - { api_id: 40,  name_az: "İngiltərə — Çempionşip",          tier: 2, country: England, fd_couk: E1, fd_org: ELC }
+  - { api_id: 79,  name_az: "Almaniya — 2. Bundesliqa",        tier: 2, country: Germany, fd_couk: D2 }
+  - { api_id: 136, name_az: "İtaliya — Seriya B",              tier: 2, country: Italy, fd_couk: I2 }
+  - { api_id: 141, name_az: "İspaniya — Sequnda",              tier: 2, country: Spain, fd_couk: SP2 }
+  - { api_id: 62,  name_az: "Fransa — Liqa 2",                 tier: 2, country: France, fd_couk: F2 }
+  - { api_id: 144, name_az: "Belçika — Pro Liqa",              tier: 2, country: Belgium, fd_couk: B1 }
+  - { api_id: 179, name_az: "Şotlandiya — Premyership",        tier: 2, country: Scotland, fd_couk: SC0 }
+  - { api_id: 218, name_az: "Avstriya — Bundesliqa",           tier: 2, country: Austria, fd_couk: "new:AUT" }
+  - { api_id: 207, name_az: "İsveçrə — Super Liqa",            tier: 2, country: Switzerland, fd_couk: "new:SWZ" }
+  - { api_id: 197, name_az: "Yunanıstan — Super Liqa",         tier: 2, country: Greece, fd_couk: G1 }
+  - { api_id: 119, name_az: "Danimarka — Superliqa",           tier: 2, country: Denmark, fd_couk: "new:DNK" }
+  - { api_id: 106, name_az: "Polşa — Ekstraklasa",             tier: 2, country: Poland, fd_couk: "new:POL" }
+  - { api_id: 113, name_az: "İsveç — Allsvenskan",             tier: 2, country: Sweden, fd_couk: "new:SWE" }
+  - { api_id: 103, name_az: "Norveç — Eliteserien",            tier: 2, country: Norway, fd_couk: "new:NOR" }
+  - { api_id: 307, name_az: "Səudiyyə Ərəbistanı — Pro Liqa",  tier: 2, country: Saudi-Arabia }
+  - { api_id: 262, name_az: "Meksika — Liqa MX",               tier: 2, country: Mexico, fd_couk: "new:MEX" }
+  - { api_id: 128, name_az: "Argentina — Liqa Profesional",    tier: 2, country: Argentina, fd_couk: "new:ARG" }
+  - { api_id: 419, name_az: "Azərbaycan — Premyer Liqa",       tier: 2, country: Azerbaijan }

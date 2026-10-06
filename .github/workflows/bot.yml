@@ -1,0 +1,63 @@
+name: Telegram əmrləri
+
+# Hər 15 dəqiqədən bir gözləyən Telegram mesajlarına cavab verir.
+# Mesaj yoxdursa iş ilk addımda (bir neçə saniyəyə) bitir.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bot
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FOOTBALL_API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
+      FOOTBALL_DATA_ORG_KEY: ${{ secrets.FOOTBALL_DATA_ORG_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PYTHONUTF8: "1"
+    steps:
+      - name: Yeni mesaj varmı?
+        id: check
+        run: |
+          if curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=0&limit=1" | grep -q '"update_id"'; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+            echo "Gözləyən mesaj yoxdur"
+          fi
+
+      - if: steps.check.outputs.pending == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.check.outputs.pending == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Asılılıqları quraşdır
+        if: steps.check.outputs.pending == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Bazanı bərpa et
+        id: pull
+        if: steps.check.outputs.pending == 'true'
+        run: bash scripts/state.sh pull
+
+      - name: Mesajlara cavab ver
+        if: steps.check.outputs.pending == 'true'
+        run: python -m backend.cli bot-poll
+
+      - name: Bazanı saxla
+        if: always() && steps.pull.outcome == 'success'
+        run: bash scripts/state.sh push --yield

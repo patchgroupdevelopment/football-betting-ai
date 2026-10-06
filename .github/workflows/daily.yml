@@ -1,0 +1,49 @@
+name: Gündəlik analiz
+
+# 08:00 Bakı: yükləmə + analiz + Telegram mesajı. 15:00 Bakı: təzə əmsal və zədələrlə yeniləmə
+# (səhər mesajı hər hansı səbəbdən göndərilməyibsə, bu iş göndərir).
+on:
+  schedule:
+    - cron: "0 4 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FOOTBALL_API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
+      FOOTBALL_DATA_ORG_KEY: ${{ secrets.FOOTBALL_DATA_ORG_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Asılılıqları quraşdır
+        run: pip install -r requirements.txt
+
+      - name: Bazanı bərpa et
+        id: pull
+        run: bash scripts/state.sh pull
+
+      - name: Yükləmə və analiz
+        run: python -m backend.cli run-daily
+
+      - name: Bazanı saxla
+        if: always() && steps.pull.outcome == 'success'
+        run: bash scripts/state.sh push

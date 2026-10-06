@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Sistemi işə sal (veb + Telegram + cədvəl)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "backend.main",
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONUTF8": "1" },
+      "justMyCode": true
+    },
+    {
+      "name": "Bugünkü məlumatı yüklə",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "backend.cli",
+      "args": ["ingest"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONUTF8": "1" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Günün oyunları (terminal)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "backend.cli",
+      "args": ["today"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONUTF8": "1" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Sistem vəziyyəti (terminal)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "backend.cli",
+      "args": ["status"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONUTF8": "1" },
+      "console": "integratedTerminal"
+    }
+  ]
+}

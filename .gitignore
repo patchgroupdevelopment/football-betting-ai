@@ -1,0 +1,19 @@
+# Gizli açarlar — heç vaxt git-ə göndərilmir
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Verilənlər bazası və loglar
+data/*
+!data/.gitkeep
+logs/*
+!logs/.gitkeep

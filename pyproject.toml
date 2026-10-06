@@ -1,0 +1,15 @@
+[project]
+name = "football-betting-ai"
+version = "0.1.0"
+description = "Futbol oyunlarının statistik analizi: Python backend, Telegram bot və veb interfeys"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+filterwarnings = ["ignore:Using .httpx. with .starlette.testclient. is deprecated"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"

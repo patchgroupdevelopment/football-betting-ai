@@ -1,0 +1,4 @@
+# Scripts and workflows run on Linux runners: keep LF line endings regardless of the OS that commits them.
+*.sh text eol=lf
+*.yml text eol=lf
+*.py text eol=lf
