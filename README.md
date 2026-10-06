@@ -81,6 +81,11 @@ Yekun ehtimalın 90%-i bazarın marjasız ehtimalına, 10%-i modelə əsaslanır
 
 Yenidən kalibrləmə: `python -m backend.cli backtest --sweep` (yalnız göstərir) və ya `--apply` (`config.yaml`-a yazır).
 
+**Misli.az ilə mərc** (`config.yaml` → `selection.user_bookmaker`): hər seçimdə "Misli.az-da əmsal ən azı X olmalıdır" yazılır
+(X = sistemin yekun ehtimalına görə ədalətli əmsal). Misli-dəki əmsalı Telegram-da yoxlayın: `/misli_12 1.45` — sistem həmin əmsalla
+dəyəri hesablayıb ✅ və ya ⛔ deyir. Backtestdə adi bukmekerin əmsalı 127 seçimin yalnız 2-sində ədalətli qiymətə çatıb, yəni
+Misli-də ✅ nadir olacaq. ⛔ olan mərclər uzun müddətdə bukmekerin marjası qədər zərər gətirir.
+
 VS Code-da: **Run and Debug** → "Sistemi işə sal".
 
 ## Kompüter sönülü olanda: GitHub Actions
@@ -112,6 +117,7 @@ Sistem GitHub-ın pulsuz serverlərində işləyir, kompüterin açıq olması l
 | `/piramida` | Piramida irəliləyişi və nəzəri yol |
 | `/neticeler` | Seçimlərin canlı nəticələri: qazanma faizi, ROI, CLV, son 30 gün, piramida |
 | `/backtest` | Son backtestin qısa hesabatı və piramida simulyasiyası |
+| `/misli_ID 1.45` | Misli.az-dakı əmsalı yoxla: bu əmsalla mərc dəyərlidirmi? (✅ / ⛔) |
 | `/status` | Sistem vəziyyəti, API limiti, növbəti yükləmə |
 | `/yenile` | Məlumatları indi yüklə |
 | `/komek` | Əmrlərin siyahısı |

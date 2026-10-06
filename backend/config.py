@@ -66,6 +66,8 @@ class SelectionConfig(BaseModel):
     max_daily_picks: int = Field(3, ge=0, le=10)
     allow_combos: bool = False
     watch_margin: int = Field(10, ge=0, le=50)  # confidence points below the minimum that still count as "watch"
+    # The bookmaker the user actually bets with: every pick shows the minimum price needed there.
+    user_bookmaker: str | None = None
     markets: list[str] = Field(default_factory=lambda: list(ALL_MARKETS))
 
     @field_validator("markets")

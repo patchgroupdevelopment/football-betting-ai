@@ -28,6 +28,7 @@ from backend.presenters.formatters import (
 from backend.backtest.service import latest_report
 from backend.presenters.backtest import format_backtest_report
 from backend.presenters.messages import MessageBuilder
+from backend.presenters.price_check import format_price_check
 from backend.presenters.results import format_track_record
 from backend.services.overview import build_daily_overview
 from backend.services.picks import get_match_analysis
@@ -61,6 +62,8 @@ def parse_command(text: str | None) -> tuple[str, list[str]]:
     name = parts[0].split("@")[0].lstrip("/").lower()
     if name.startswith("oyun_"):
         return "oyun", [name.removeprefix("oyun_"), *parts[1:]]
+    if name.startswith("misli_"):
+        return "misli", [name.removeprefix("misli_"), *parts[1:]]
     return name, parts[1:]
 
 
@@ -73,6 +76,25 @@ def authorization_reply(container: AppContainer, chat_id: int) -> MessageBuilder
         logger.warning("İcazəsiz Telegram istifadəçisi: chat_id=%s", chat_id)
         return text_message(t("bot.unauthorized"))
     return None
+
+
+def price_check_message(container: AppContainer, args: list[str]) -> MessageBuilder:
+    """/misli_12 1.45 — is the price at the user's bookmaker worth taking?"""
+    match_id = next((int(a) for a in args if a.isdigit()), None)
+    odds = next((_parse_odds(a) for a in args if not a.isdigit() and _parse_odds(a) is not None), None)
+    if match_id is None:
+        return text_message(t("price.usage"))
+    bookmaker = container.config.selection.user_bookmaker or "Misli.az"
+    view = get_match_analysis(container.db, match_id, container.tz)
+    state = container.pyramid_service().get_state()
+    return format_price_check(view, odds, bookmaker, state)
+
+
+def _parse_odds(text: str) -> float | None:
+    try:
+        return float(text.replace(",", "."))
+    except ValueError:
+        return None
 
 
 def track_record_message(container: AppContainer) -> MessageBuilder:
@@ -109,11 +131,13 @@ async def respond(container: AppContainer, runner: PipelineRunner, incoming: Inc
         if digits is None:
             return text_message(t("detail.not_found"))
         view = await asyncio.to_thread(get_match_analysis, container.db, int(digits), container.tz)
-        return format_match_detail(view)
+        return format_match_detail(view, user_bookmaker=container.config.selection.user_bookmaker)
     if command == "piramida":
         service = container.pyramid_service()
         state = await asyncio.to_thread(service.get_state)
         return format_pyramid(state, service.projection(state), paper_mode=container.settings.paper_mode)
+    if command == "misli":
+        return await asyncio.to_thread(price_check_message, container, args)
     if command == "neticeler":
         return await asyncio.to_thread(track_record_message, container)
     if command == "backtest":

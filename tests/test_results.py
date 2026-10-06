@@ -165,3 +165,41 @@ def test_dashboard_contains_data_but_no_secrets(db, app_config, tmp_path):
     for secret_name in ("FOOTBALL_API_KEY", "TELEGRAM_BOT_TOKEN", "X-Auth-Token", "api_key"):
         assert secret_name not in text
     assert (tmp_path / ".nojekyll").exists()
+
+
+# ------------------------------------------------------------------ price check at the user's bookmaker
+
+
+def test_minimum_odds_is_the_fair_price_rounded_up():
+    from backend.presenters.formatters import min_odds
+
+    class View:
+        p_final = 0.7
+
+    assert min_odds(View()) == 1.43  # 1 / 0.7 = 1.4286 → never below fair
+    View.p_final = 0.5
+    assert min_odds(View()) == 2.0
+
+
+def test_misli_command_checks_a_price(db, app_config):
+    ids = _seed(db)
+    container = _container(db, app_config)
+    match_id = ids["tonight_match"]
+    bad = _reply(container, f"/misli_{match_id} 1,30")  # comma decimal is accepted
+    assert "ƏMSAL YOXLAMASI" in bad and "⛔" in bad and "1.30" in bad
+    good = _reply(container, f"/misli {match_id} 1.55")
+    assert "✅" in good and "Piramida" in good
+    assert "İstifadə" in _reply(container, "/misli")
+    assert "seçimi yoxdur" in _reply(container, "/misli_99999 1.5")
+    assert "1.01" in _reply(container, f"/misli_{match_id} 0.5")
+
+
+def test_pick_card_shows_the_minimum_price_at_the_users_bookmaker(db, app_config):
+    from backend.presenters.formatters import format_match_detail
+    from backend.services.picks import get_match_analysis
+
+    ids = _seed(db)
+    view = get_match_analysis(db, ids["tonight_match"], TZ)
+    text = format_match_detail(view, user_bookmaker="Misli.az").render_plain()
+    assert "Misli.az-da əmsal ən azı 1.43" in text and f"/misli_{ids['tonight_match']}" in text
+    assert "Misli" not in format_match_detail(view).render_plain()

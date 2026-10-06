@@ -21,6 +21,7 @@ selection:
   max_daily_picks: 3
   allow_combos: false                 # ekspress (kombinasiya) mərcləri
   watch_margin: 10                    # əminlik həddən bu qədər aşağıdırsa — "İZLƏMƏDƏ SAXLA"
+  user_bookmaker: "Misli.az"          # mərc etdiyiniz bukmeker: hər seçimdə orada lazım olan minimum əmsal göstərilir
   # Analiz olunan marketlər. Silinən market heç vaxt təklif olunmur.
   markets: [1X2, DC, DNB, OU, OU_1H, BTTS, TEAM_TOTAL_HOME, TEAM_TOTAL_AWAY, AH, CORNERS_OU, CARDS_OU]
 

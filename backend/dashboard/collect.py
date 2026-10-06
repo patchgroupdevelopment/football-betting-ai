@@ -18,6 +18,7 @@ from backend.database.session import Database
 from backend.i18n.az import DASHBOARD, DECISION_ICONS, DECISIONS, MARKETS, PYRAMID_MODES, RISK_LEVELS
 from backend.models import Bet, Match, ModelRun, OddsSnapshot, Prediction, PyramidStage, Team
 from backend.models.constants import BetStatus, Decision
+from backend.presenters.formatters import min_odds
 from backend.presenters.labels import reasons_text, selection_label
 from backend.services.picks import PickView, day_predictions
 from backend.services.pyramid import PyramidService
@@ -59,6 +60,7 @@ def _pick(view: PickView) -> dict[str, Any]:
         "p_market": _pct(view.p_market),
         "p_model": _pct(view.p_model),
         "fair_odds": round(view.fair_odds, 2) if view.fair_odds else None,
+        "min_odds": min_odds(view) if has else None,
         "ev": _pct(view.ev),
         "confidence": view.confidence,
         "risk": view.risk,
@@ -214,6 +216,7 @@ def collect(db: Database, config: AppConfig, tz: ZoneInfo, day: date, *, paper_m
         "labels": DASHBOARD,
         "generated": format_datetime(local_now(tz)),
         "paper_mode": paper_mode,
+        "user_bookmaker": config.selection.user_bookmaker,
         "today": _today(db, day, tz),
         "results": _results(db, day, tz),
         "pyramid": _pyramid(db, config),

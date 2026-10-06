@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Sequence
 from datetime import date
 
@@ -45,6 +46,7 @@ BOT_COMMANDS: tuple[tuple[str, str], ...] = (
     ("piramida", "bot.cmd.piramida"),
     ("neticeler", "bot.cmd.neticeler"),
     ("backtest", "bot.cmd.backtest"),
+    ("misli", "bot.cmd.misli"),
     ("status", "bot.cmd.status"),
     ("yenile", "bot.cmd.yenile"),
     ("komek", "bot.cmd.komek"),
@@ -364,7 +366,18 @@ def _verdict(view: PickView) -> str:
     return t("verdict.watch" if view.decision == Decision.WATCH else "verdict.no_bet", reasons=reasons_text(keys))
 
 
-def _pick_numbers(msg: MessageBuilder, view: PickView) -> None:
+def min_odds(view: PickView) -> float | None:
+    """The lowest price at which the pick still has non-negative value (fair odds, rounded up)."""
+    if not view.p_final:
+        return None
+    return math.ceil(100 / view.p_final - 1e-9) / 100
+
+
+def _example_odds(view: PickView) -> str:
+    return format_odds(view.odds or min_odds(view) or 1.5)
+
+
+def _pick_numbers(msg: MessageBuilder, view: PickView, user_bookmaker: str | None = None) -> None:
     msg.line(t("pick.bet", label=_label(view)))
     if view.odds:
         msg.line(t("pick.odds", odds=format_odds(view.odds), bookmaker=view.bookmaker or "—"))
@@ -381,6 +394,17 @@ def _pick_numbers(msg: MessageBuilder, view: PickView) -> None:
         msg.line(t("pick.risk", icon=icon, risk=risk))
     if view.fair_odds:
         msg.line(t("pick.fair_odds", fair=format_odds(view.fair_odds)))
+    minimum = min_odds(view)
+    if user_bookmaker and minimum:
+        msg.line(
+            t(
+                "pick.user_bookmaker",
+                bookmaker=user_bookmaker,
+                fair=format_odds(minimum),
+                match_id=view.match_id,
+                example=_example_odds(view),
+            )
+        )
 
 
 def _bullets(msg: MessageBuilder, title_key: str, lines: Sequence[str]) -> None:
@@ -432,7 +456,7 @@ def _counts_line(analysis: DailyAnalysis) -> str:
     )
 
 
-def _other_picks(msg: MessageBuilder, picks: Sequence[PickView]) -> None:
+def _other_picks(msg: MessageBuilder, picks: Sequence[PickView], user_bookmaker: str | None = None) -> None:
     msg.section()
     msg.line(bold(t("analysis.other_picks")))
     msg.blank()
@@ -451,6 +475,17 @@ def _other_picks(msg: MessageBuilder, picks: Sequence[PickView]) -> None:
                 risk=risk,
             )
         )
+        minimum = min_odds(view)
+        if user_bookmaker and minimum:
+            msg.line(
+                t(
+                    "pick.user_bookmaker_short",
+                    bookmaker=user_bookmaker,
+                    fair=format_odds(minimum),
+                    match_id=view.match_id,
+                    example=_example_odds(view),
+                )
+            )
         msg.line(t("analysis.detail_link", match_id=view.match_id))
 
 
@@ -487,7 +522,12 @@ def _no_bet_section(msg: MessageBuilder, analysis: DailyAnalysis) -> None:
 
 
 def format_daily_analysis(
-    analysis: DailyAnalysis, state: PyramidState, *, paper_mode: bool, refresh_hint: str | None = None
+    analysis: DailyAnalysis,
+    state: PyramidState,
+    *,
+    paper_mode: bool,
+    refresh_hint: str | None = None,
+    user_bookmaker: str | None = None,
 ) -> MessageBuilder:
     msg = MessageBuilder()
     msg.line(bold(t("analysis.title")))
@@ -511,10 +551,10 @@ def format_daily_analysis(
         msg.line(t("analysis.match_line", home=best.home, away=best.away))
         msg.line(_when(best, analysis.target_date))
         msg.blank()
-        _pick_numbers(msg, best)
+        _pick_numbers(msg, best, user_bookmaker)
         _reasoning(msg, best)
         if len(analysis.picks) > 1:
-            _other_picks(msg, analysis.picks[1:])
+            _other_picks(msg, analysis.picks[1:], user_bookmaker)
     else:
         _no_bet_section(msg, analysis)
 
@@ -527,7 +567,7 @@ def format_daily_analysis(
     return _append_disclaimer(msg)
 
 
-def format_match_detail(view: PickView | None) -> MessageBuilder:
+def format_match_detail(view: PickView | None, *, user_bookmaker: str | None = None) -> MessageBuilder:
     if view is None:
         return text_message(t("detail.not_found"))
     msg = MessageBuilder()
@@ -552,7 +592,7 @@ def format_match_detail(view: PickView | None) -> MessageBuilder:
     )
     if view.has_candidate:
         msg.blank()
-        _pick_numbers(msg, view)
+        _pick_numbers(msg, view, user_bookmaker)
     quality = view.reasons.get("quality") or {}
     if quality:
         level = quality.get("level", "low")

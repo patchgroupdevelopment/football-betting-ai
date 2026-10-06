@@ -101,7 +101,9 @@ class PipelineRunner:
         container = self._container
         analysis = await asyncio.to_thread(build_daily_analysis, container.db, day, container.tz)
         state = await asyncio.to_thread(container.pyramid_service().get_state)
-        return format_daily_analysis(analysis, state, paper_mode=container.settings.paper_mode)
+        return format_daily_analysis(
+            analysis, state, paper_mode=container.settings.paper_mode, user_bookmaker=container.config.selection.user_bookmaker
+        )
 
     async def _deliver(self, result: PipelineResult, day: date, trigger: Trigger) -> None:
         if self.notifier is None or trigger == "refresh":

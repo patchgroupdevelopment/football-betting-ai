@@ -61,6 +61,9 @@ section[hidden] { display: none; }
 ul.reasons { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
 ul.reasons li { margin: 2px 0; }
 .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.user-min { background: var(--warn-soft); border-radius: 8px; padding: 6px 10px; margin: 4px 0 8px; font-size: 14px; }
+.user-min b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.user-min .note { margin: 0; }
 .notice { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 16px; color: var(--muted); }
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -186,6 +189,9 @@ footer { margin-top: 36px; color: var(--muted); font-size: 12px; border-top: 1px
       el("div", { class: "match-name", text: p.home + " – " + p.away }),
       el("div", { class: "pick-label", text: dash(p.pick) }),
       el("div", { class: "odds-line" }, el("b", { text: num(p.odds) }), " · " + dash(p.bookmaker)),
+      D.user_bookmaker && p.min_odds ? el("div", { class: "user-min" },
+        el("span", { text: L.user_min_odds.replace("{bookmaker}", D.user_bookmaker) + ": " }), el("b", { text: num(p.min_odds) }),
+        el("span", { class: "note", text: " · " + L.user_check + ": /misli_" + p.match_id + " " + num(p.odds || p.min_odds) })) : null,
       stats, why, against,
       el("div", { class: "note", text: L.best_price_note })
     );

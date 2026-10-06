@@ -131,7 +131,13 @@ def cmd_analyze(container: AppContainer, args: argparse.Namespace) -> int:
 def _analysis_message(container: AppContainer, day: date, refresh_hint: str | None = None) -> MessageBuilder:
     analysis = build_daily_analysis(container.db, day, container.tz)
     state = container.pyramid_service().get_state()
-    return format_daily_analysis(analysis, state, paper_mode=container.settings.paper_mode, refresh_hint=refresh_hint)
+    return format_daily_analysis(
+        analysis,
+        state,
+        paper_mode=container.settings.paper_mode,
+        refresh_hint=refresh_hint,
+        user_bookmaker=container.config.selection.user_bookmaker,
+    )
 
 
 def cmd_picks(container: AppContainer, args: argparse.Namespace) -> int:
@@ -141,7 +147,7 @@ def cmd_picks(container: AppContainer, args: argparse.Namespace) -> int:
 
 def cmd_match(container: AppContainer, args: argparse.Namespace) -> int:
     view = get_match_analysis(container.db, args.match_id, container.tz)
-    _print(format_match_detail(view))
+    _print(format_match_detail(view, user_bookmaker=container.config.selection.user_bookmaker))
     return 0 if view else 1
 
 

@@ -445,6 +445,20 @@ MESSAGES: dict[str, str] = {
     "pick.risk": "{icon} Risk səviyyəsi: {risk}",
     "pick.fair_odds": "⚖️ Ədalətli əmsal: {fair} — bundan aşağı əmsalla mərc dəyərsizdir",
     "pick.quality": "🧾 Məlumat tamlığı: {score}% {icon} {level}",
+    "pick.user_bookmaker": "🔎 {bookmaker}-da əmsal ən azı {fair} olmalıdır — aşağıdırsa, mərc etməyin. Yoxlamaq: /misli_{match_id} {example}",
+    "pick.user_bookmaker_short": "   {bookmaker}: ən azı {fair} · yoxla: /misli_{match_id} {example}",
+    # --- Price check at the user's bookmaker (/misli_ID 1.45) ---
+    "price.title": "🔎 ƏMSAL YOXLAMASI — {bookmaker}",
+    "price.usage": "İstifadə: /misli_ID ƏMSAL — məsələn /misli_12 1.45 (ID /secimler və ya /bugun siyahısındadır).",
+    "price.no_pick": "Bu oyun üçün sistemin seçimi yoxdur — yoxlanacaq mərc yoxdur.",
+    "price.bad_odds": "Əmsal 1.01 ilə 100 arasında olmalıdır (məs. 1.45).",
+    "price.pick": "{home} – {away} · {label}",
+    "price.numbers": "{bookmaker} əmsalı: {odds} · minimum (ədalətli) əmsal: {fair} · ən yaxşı bazar əmsalı: {best}",
+    "price.ev": "Bu əmsalla dəyər (EV): {ev}",
+    "price.ok": "✅ Əmsal ədalətli qiymətdən yüksəkdir — riyazi cəhətdən mərc etmək olar. Bu, qazancın zəmanəti deyil.",
+    "price.bad": "⛔ Mərc etməyin: bu əmsal bazarın ədalətli qiymətindən aşağıdır, uzun müddətdə zərər gətirir.",
+    "price.pyramid": "💰 Piramida: {before} → {after} (qazansa)",
+    "price.not_bet": "ℹ️ Diqqət: sistemin bu oyun üçün qərarı \"{decision}\"-dir.",
 
     # --- Daily analysis ---
     "analysis.title": "⚽ GÜNÜN FUTBOL ANALİZİ",
@@ -549,6 +563,7 @@ MESSAGES: dict[str, str] = {
     "results.backtest_line": "🧪 Backtest (son 12 ay): {bets} mərc · qazanma {hit} · ROI {roi} · CLV {clv}",
     "bot.cmd.neticeler": "Seçimlərin nəticələri və statistika",
     "bot.cmd.backtest": "Keçmiş oyunlarda yoxlama (backtest)",
+    "bot.cmd.misli": "Misli.az əmsalını yoxla: /misli_ID 1.45",
     # Backtest
     "backtest.title": "🧪 BACKTEST — SİSTEMİN KEÇMİŞ OYUNLARDA YOXLANMASI",
     "backtest.missing": "Hələ backtest aparılmayıb. Əmr: python -m backend.cli backtest",
@@ -750,6 +765,8 @@ DASHBOARD: dict[str, str] = {
     "why": "Niyə bu seçim",
     "against": "Əleyhinə",
     "best_price_note": "Dəyər yalnız göstərilən bukmekerin əmsalında var. Daha aşağı əmsalla mərc etmək üstünlüyü aradan qaldırır.",
+    "user_min_odds": "{bookmaker}-da minimum əmsal",
+    "user_check": "Telegram-da yoxlayın",
     "live_record": "Canlı nəticələr (simulyasiya, hər mərcə 1 vahid)",
     "all_picks": "Bütün seçimlər",
     "top_only": "Yalnız 1-ci seçim",
