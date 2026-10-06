@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from statistics import fmean
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from backend.config import BankrollConfig
 from backend.database.session import Database
@@ -34,6 +34,21 @@ def _money(value: float | Decimal) -> Decimal:
 
 def next_balance(balance: float, odds: float) -> float:
     return float(_money(_money(balance) * Decimal(str(odds))))
+
+
+def milestone_lock(before: float, after: float, config: BankrollConfig, passed: int = 0) -> float:
+    """In milestone_lock mode, reaching the next milestone moves a share of the balance out of play.
+
+    Each milestone locks once per attempt, in order (``passed`` = milestones already locked in the
+    attempt): after a lock the balance falls back below the milestone, and crossing it again must
+    not lock again, or the balance could never grow past the first milestone.
+    """
+    if config.mode != "milestone_lock":
+        return 0.0
+    pending = sorted(config.milestones)[passed:]
+    if not pending or after < pending[0] or before >= after:
+        return 0.0
+    return float(_money(Decimal(str(after)) * Decimal(str(config.lock_fraction))))
 
 
 @dataclass(frozen=True)
@@ -176,7 +191,12 @@ class PyramidService:
                 raise PyramidError("pyramid.error_no_pending")
             if outcome == StageStatus.WON:
                 gross = next_balance(pending.balance_before, pending.odds)
-                locked = self._lock_amount(pending.balance_before, gross)
+                passed = session.scalar(
+                    select(func.count(PyramidStage.id)).where(
+                        PyramidStage.attempt_no == pending.attempt_no, PyramidStage.locked_amount > 0
+                    )
+                )
+                locked = milestone_lock(pending.balance_before, gross, self._config, passed or 0)
                 pending.balance_after = float(_money(gross) - _money(locked))
                 pending.locked_amount = locked
             elif outcome == StageStatus.LOST:
@@ -186,14 +206,6 @@ class PyramidService:
             pending.status = outcome
             pending.settled_at = utcnow()
         return self.get_state()
-
-    def _lock_amount(self, before: float, after: float) -> float:
-        """In milestone_lock mode, crossing a milestone moves a share of the balance out of play."""
-        if self._config.mode != "milestone_lock":
-            return 0.0
-        if not any(before < milestone <= after for milestone in self._config.milestones):
-            return 0.0
-        return float(_money(Decimal(str(after)) * Decimal(str(self._config.lock_fraction))))
 
     def _derive(self, rows: list[PyramidStage]) -> PyramidState:
         cfg = self._config

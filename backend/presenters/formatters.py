@@ -43,6 +43,8 @@ BOT_COMMANDS: tuple[tuple[str, str], ...] = (
     ("bugun", "bot.cmd.bugun"),
     ("secimler", "bot.cmd.secimler"),
     ("piramida", "bot.cmd.piramida"),
+    ("neticeler", "bot.cmd.neticeler"),
+    ("backtest", "bot.cmd.backtest"),
     ("status", "bot.cmd.status"),
     ("yenile", "bot.cmd.yenile"),
     ("komek", "bot.cmd.komek"),

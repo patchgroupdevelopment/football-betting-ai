@@ -1,12 +1,11 @@
-name: Gündəlik analiz
+name: Həftəlik backtest
 
-# 08:00 Bakı: yükləmə + nəticələrin hesablanması + analiz + Telegram mesajı.
-# 15:00 Bakı: təzə əmsal və zədələrlə yeniləmə (səhər mesajı göndərilməyibsə, bu iş göndərir).
-# Hər işdən sonra veb panel (GitHub Pages) yenilənir.
+# Hər bazar ertəsi 06:30 Bakı: sistem son 12 ayın oyunlarında yoxlanır, hesabat bazaya yazılır
+# (/backtest əmri və veb panel onu göstərir). Qaydalar avtomatik dəyişdirilmir — kalibrləmə
+# lokalda edilir: python -m backend.cli backtest --sweep [--apply]
 on:
   schedule:
-    - cron: "0 4 * * *"
-    - cron: "0 11 * * *"
+    - cron: "30 2 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -15,18 +14,14 @@ permissions:
   id-token: write
 
 concurrency:
-  group: daily
+  group: daily  # the same database as the daily run: never at the same time
   cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     env:
-      FOOTBALL_API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
-      FOOTBALL_DATA_ORG_KEY: ${{ secrets.FOOTBALL_DATA_ORG_KEY }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PYTHONUTF8: "1"
     steps:
@@ -40,12 +35,19 @@ jobs:
       - name: Asılılıqları quraşdır
         run: pip install -r requirements.txt
 
+      - name: Tarixi CSV faylları (keş)
+        uses: actions/cache@v4
+        with:
+          path: data/cache/football-data
+          key: football-data-${{ github.run_id }}
+          restore-keys: football-data-
+
       - name: Bazanı bərpa et
         id: pull
         run: bash scripts/state.sh pull
 
-      - name: Yükləmə, nəticələr və analiz
-        run: python -m backend.cli run-daily
+      - name: Backtest
+        run: python -m backend.cli backtest
 
       - name: Bazanı saxla
         if: always() && steps.pull.outcome == 'success'

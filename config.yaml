@@ -7,7 +7,7 @@
 bankroll:
   starting: 2.0                       # başlanğıc balans (AZN)
   target: 10000.0                     # hədəf balans (AZN)
-  mode: classic                       # classic | milestone_lock (qazanc kilidi)
+  mode: milestone_lock                # classic | milestone_lock (qazanc kilidi). Backtest: klassikdə bütün qazanc sonda itir
   milestones: [50, 250, 1000, 5000]   # qazanc kilidi mərhələləri (AZN)
   lock_fraction: 0.5                  # mərhələ keçiləndə balansın kilidlənən payı
   projection_odds: 1.50               # piramida proqnozu üçün nümunə əmsal
@@ -16,8 +16,8 @@ bankroll:
 selection:
   min_odds: 1.20
   max_odds: 1.70
-  min_confidence: 75
-  min_ev: 0.03                        # minimum dəyər üstünlüyü (EV)
+  min_confidence: 55                  # backtest ilə kalibrlənib (python -m backend.cli backtest --sweep)
+  min_ev: 0.0                         # minimum dəyər (EV); 0 = əmsal ən azı bazarın ədalətli qiymətinə bərabərdir
   max_daily_picks: 3
   allow_combos: false                 # ekspress (kombinasiya) mərcləri
   watch_margin: 10                    # əminlik həddən bu qədər aşağıdırsa — "İZLƏMƏDƏ SAXLA"
@@ -37,7 +37,7 @@ confidence_weights:
   market: 0.05                        # bazar dəyəri
 
 model:
-  market_blend_weight: 0.4            # yekun ehtimalda modelin payı (qalanı bazar)
+  market_blend_weight: 0.1            # yekun ehtimalda modelin payı (qalanı bazar)
   llm_max_adjustment_pp: 4            # LLM-in ehtimalı dəyişə biləcəyi maksimum faiz bəndi
   elo_weight: 0.25                    # 1X2 tipli marketlərdə Elo-nun payı (qalanı Dixon-Coles)
   xg_weight: 0.6                      # komanda gücündə xG-nin payı (qalanı faktiki qollar)

@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from zoneinfo import ZoneInfo
 
-from backend.config import AppConfig, Settings, get_config, get_settings
+from backend.backtest.service import BacktestService
+from backend.config import PROJECT_ROOT, AppConfig, Settings, get_config, get_settings
 from backend.database.session import Database
 from backend.services.analysis import AnalysisReport, AnalysisService
 from backend.services.cache import ResponseCache
@@ -17,6 +18,7 @@ from backend.services.external.sync import ExternalDataSync, ExternalSyncReport
 from backend.services.ingestion import IngestionReport, IngestionService
 from backend.services.providers.api_football import ApiFootballClient
 from backend.services.pyramid import PyramidService
+from backend.services.results import ResultsService, SettlementReport
 
 
 @dataclass
@@ -78,6 +80,19 @@ class AppContainer:
 
     def pyramid_service(self) -> PyramidService:
         return PyramidService(self.db, self.config.bankroll)
+
+    def results_service(self) -> ResultsService:
+        return ResultsService(self.db, self.pyramid_service(), paper_mode=self.settings.paper_mode)
+
+    def run_settlement(self) -> SettlementReport:
+        return self.results_service().settle()
+
+    def open_pyramid_stage(self, day: date) -> bool:
+        return self.results_service().open_stage(day)
+
+    def backtest_service(self) -> BacktestService:
+        cache_dir = PROJECT_ROOT / "data" / "cache" / "football-data"
+        return BacktestService(self.db, self.config, self.tz, cache_dir, self.settings.config_path)
 
     def close(self) -> None:
         if self._api_client is not None:

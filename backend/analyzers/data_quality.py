@@ -49,6 +49,11 @@ def level_for(score: int) -> QualityLevel:
     return "low"
 
 
+def quality_from(components: dict[str, bool]) -> DataQuality:
+    score = sum(WEIGHTS[name] for name, present in components.items() if present)
+    return DataQuality(score=score, level=level_for(score), components=components)
+
+
 def _recent_xg(session: Session, team_id: int, match: Match) -> list[float | None]:
     """xG of the team's recent finished matches (None where unknown), newest first.
 
@@ -122,5 +127,4 @@ def assess_match(session: Session, match: Match) -> DataQuality:
         "h2h": match.h2h_checked_at is not None or _has_previous_meeting(session, match),
         "lineups": (session.scalar(select(func.count(Lineup.id)).where(Lineup.match_id == match.id)) or 0) >= 2,
     }
-    score = sum(WEIGHTS[name] for name, present in components.items() if present)
-    return DataQuality(score=score, level=level_for(score), components=components)
+    return quality_from(components)

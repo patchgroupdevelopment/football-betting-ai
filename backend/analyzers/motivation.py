@@ -69,26 +69,18 @@ def load_standing(session: Session, league_id: int, season: int, team_id: int) -
     )
 
 
-def computed_standing(session: Session, league_id: int, season: int, team_id: int) -> StandingInfo | None:
-    """A league table rebuilt from stored results, for leagues without an official standings feed.
+Table = dict[int, list[int]]  # team -> [points, played, goal difference]
 
-    Only meaningful when the league's complete results are stored (``League.full_results``).
-    """
-    rows = session.execute(
-        select(Match.home_team_id, Match.away_team_id, Match.home_goals, Match.away_goals).where(
-            Match.league_id == league_id,
-            Match.season == season,
-            Match.status.in_(FINISHED_STATUSES),
-            Match.home_goals.is_not(None),
-        )
-    ).all()
-    table: dict[int, list[int]] = {}  # team -> [points, played, goal difference]
-    for home, away, home_goals, away_goals in rows:
-        for team, scored, conceded in ((home, home_goals, away_goals), (away, away_goals, home_goals)):
-            entry = table.setdefault(team, [0, 0, 0])
-            entry[0] += 3 if scored > conceded else 1 if scored == conceded else 0
-            entry[1] += 1
-            entry[2] += scored - conceded
+
+def add_result(table: Table, home: int, away: int, home_goals: int, away_goals: int) -> None:
+    for team, scored, conceded in ((home, home_goals, away_goals), (away, away_goals, home_goals)):
+        entry = table.setdefault(team, [0, 0, 0])
+        entry[0] += 3 if scored > conceded else 1 if scored == conceded else 0
+        entry[1] += 1
+        entry[2] += scored - conceded
+
+
+def table_standing(table: Table, team_id: int) -> StandingInfo | None:
     if team_id not in table or len(table) < 6:
         return None
     ranked = sorted(table, key=lambda t: (table[t][0], table[t][2]), reverse=True)
@@ -105,6 +97,25 @@ def computed_standing(session: Session, league_id: int, season: int, team_id: in
         description=None,
         form=None,
     )
+
+
+def computed_standing(session: Session, league_id: int, season: int, team_id: int) -> StandingInfo | None:
+    """A league table rebuilt from stored results, for leagues without an official standings feed.
+
+    Only meaningful when the league's complete results are stored (``League.full_results``).
+    """
+    rows = session.execute(
+        select(Match.home_team_id, Match.away_team_id, Match.home_goals, Match.away_goals).where(
+            Match.league_id == league_id,
+            Match.season == season,
+            Match.status.in_(FINISHED_STATUSES),
+            Match.home_goals.is_not(None),
+        )
+    ).all()
+    table: Table = {}
+    for home, away, home_goals, away_goals in rows:
+        add_result(table, home, away, home_goals, away_goals)
+    return table_standing(table, team_id)
 
 
 def is_knockout(round_name: str | None) -> bool:

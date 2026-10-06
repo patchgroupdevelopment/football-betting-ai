@@ -116,7 +116,9 @@ Sxem dəyişiklikləri: `alembic revision --autogenerate -m "..."`, sonra `pytho
 
 `növbəti balans = balans × əmsal`, sentə qədər yuxarı yuvarlaqlaşdırılır. Bir məğlubiyyət cəhdi bitirir, yeni cəhd
 başlanğıc məbləğdən başlayır. "Bütün cəhdlərə qoyulan" məbləğ strategiyanın real xərcini göstərir.
-`milestone_lock` rejimində mərhələ keçiləndə balansın bir hissəsi kilidlənir.
+`milestone_lock` rejimində növbəti mərhələyə (50, 250, 1000, 5000 AZN) çatanda balansın yarısı kilidlənir — hər mərhələ
+bir cəhddə yalnız bir dəfə (əvvəllər balans kiliddən sonra yenidən 50-dən keçəndə təkrar kilidlənirdi və 100 AZN-dən yuxarı qalxa bilmirdi).
+Paper rejimdə piramida sistemi izləyir: günün 1-ci seçimi gözləyən mərhələ yoxdursa yeni mərhələ açır, nəticəsi gələndə hesablaşılır.
 
 2 → 10,000 AZN üçün lazım olan ardıcıl qələbə sayı: 1.20 ilə 47, 1.30 ilə 33, 1.50 ilə 22, 1.70 ilə 17.
 Hər mərhələdə +5% dəyər üstünlüyü olsa belə, bir cəhdin hədəfə çatma ehtimalı ~0.03–0.2%-dir. Sistem bunu açıq göstərir.
@@ -134,16 +136,16 @@ hər oyun üçün kontekst ────────────┤  forma 5/10, 
                                    ▼
         hesab matrisi (Dixon-Coles ρ) ──► 11 marketin ehtimalı
                                    ▼
-        bazar: hər bukmeker üçün marja çıxılır → orta; ən yaxşı əmsal seçilir
+        bazar: hər bukmeker üçün marja power üsulu ilə çıxılır → orta; ən yaxşı əmsal seçilir
                                    ▼
         namizəd: əmsal 1.20–1.70, bazar ehtimalı var
-        yekun ehtimal = 0.4 × model + 0.6 × bazar;  EV = yekun × əmsal − 1
+        yekun ehtimal = 0.1 × model + 0.9 × bazar;  EV = yekun × əmsal − 1   (backtestlə seçilib)
                                    ▼
         əminlik (9 çəki, faktor seçimi nə qədər dəstəkləyir) ≤ məlumat tamlığı + 10
         risk (əmsal, tamlıq, əminlik, market növü, ziddiyyət, kritik zədə)
         bloklar: az məlumat · model–bazar fərqi > 15 f.b. · ≥3 zidd faktor · kritik zədə · yüksək risk
                                    ▼
-        BET (EV ≥ 3% və əminlik ≥ 75) · WATCH (müsbət EV, əminlik ≥ 65) · NO_BET
+        BET (EV ≥ 0 və əminlik ≥ 55) · WATCH (müsbət EV, əminlik ≥ 45) · NO_BET
                                    ▼
         hər oyundan bir seçim; gündə ən çox 3 (EV × əminlik sırası ilə) → paper mərc (1 vahid)
 ```
@@ -158,13 +160,45 @@ orada həmişə uduzma ehtimalı, ən zəif faktorlar, məlumat boşluqları və
 **Hələ olmayanlar (sonrakı mərhələlər):** rotasiya və növbəti vacib oyun (komandaların növbəti oyunları yüklənmir),
 heyət açıqlananda yenidən qiymətləndirmə, LLM kontekst analizi.
 
+## 7a. Nəticələr və backtest (Mərhələ 3)
+
+**Hesablaşma** (`services/results.py`, `services/settlement.py`): hər gündəlik işdə yükləmədən sonra bitmiş oyunların paper mərcləri
+hesabdan hesablanır (1X2, DC, DNB, BTTS, ÜST/ALT, handikap, komanda qolları, künclər, kartlar). Ləğv olunan və ya 3 gün ərzində
+lazımi məlumatı gəlməyən oyunlar "qaytarılır". CLV = alınan əmsal × başlamazdan əvvəl saxlanmış son əmsalların marjasız ehtimalı − 1.
+Nəticələr Telegram-a "NƏTİCƏLƏR" mesajı ilə gedir, `/neticeler` statistikanı göstərir.
+
+**Backtest** (`backend/backtest/`), walk-forward, gələcəyə baxış olmadan:
+```
+football-data.co.uk CSV (26 liqa, 4 mövsüm; keçmiş mövsümlər diskdə saxlanılır)
+   └─► hər gün: yalnız bu günə qədərki nəticələr tarixçəyə əlavə olunur
+         └─► model canlıdakı kimi yenidən qurulur (540 günlük pəncərə)
+               └─► hər oyun canlı mühərriklə (evaluate_match) qiymətləndirilir:
+                     əsas liqalar — turdan əvvəlki əmsallar, əlavə liqalar — bağlanış əmsalı
+                     └─► hər namizəd nəticə və bağlanış qiyməti ilə saxlanılır
+                           └─► qaydalar namizədlər üzərində təkrarlanır (simulate.py) — model yenidən işlədilmədən
+```
+- Təkrarlama canlı qərarları dəqiq təkrarlayır (test: `test_replay_reproduces_the_live_decisions`).
+- Metrikalar: ROI, qazanma faizi (gözlənilənlə), orta əmsal, geriləmə, uduzma seriyası, CLV; marketlər, liqalar, əminlik,
+  əmsal aralığı, bukmeker, ay üzrə; 3/6/12 ay; Brier və log loss (model / bazar / yekun / bağlanış); kalibrləmə qrafiki.
+- Kalibrləmə (`sweep.py`): 120 kombinasiya (model payı × minimum EV × minimum əminlik). Etibarlı sayılır: hər iki yarımildə ≥ 30 mərc
+  və müsbət ROI, orta CLV > 0. Seçilən qaydalar yalnız `--apply` ilə yazılır.
+- Piramida simulyasiyası: "gündə 1 mərhələ" və "zəncir" (gün ərzində əvvəlki oyun bitəndən sonra növbəti), klassik və qazanc kilidi;
+  ən yüksək balans, harada və hansı oyunda qırıldığı, qırılma mərhələlərinin paylanması.
+- Məhdudiyyətlər (hesabatda yazılır): tarixi əmsallar yalnız 1X2, ÜST/ALT 2.5 və Asiya handikapı üçün var; zədə siyahıları yoxdur;
+  üstünlük əsasən ən yaxşı əmsalı seçməkdən gəlir.
+
+## 7b. Veb panel (Mərhələ 5)
+
+`backend/dashboard/` bazadan məlumatı toplayır (`collect.py`, bütün mətnlər `i18n/az.py`-dəki `DASHBOARD` lüğətindən) və
+tək, özündə hər şeyi saxlayan HTML yaradır (`template.html`, qrafiklər Chart.js ilə). GitHub Actions hər işdən sonra onu GitHub Pages-ə
+yerləşdirir. Açar və token səhifəyə heç vaxt düşmür (test ilə yoxlanılır). Repo açıq olduğu üçün panel də açıqdır.
+
 ## 8. Sonrakı mərhələlər
 
 | Mərhələ | Əsas işlər |
 |---|---|
-| 3 | Nəticələrin hesablanması, statistika (marketlər üzrə), CLV; football-data.co.uk ilə walk-forward backtest; kalibrləmə; Monte Carlo piramida |
 | 4 | LLM provayder interfeysi (Anthropic / OpenRouter), ciddi JSON sxemi, "BU MƏRC NİYƏ UDUZA BİLƏR?", tənqidçi keçidi, faktların yoxlanması; heyət və əmsal monitorinqi |
-| 5 | Tam dashboard (FastAPI + Jinja2 + HTMX + Chart.js) |
+| 5+ | Paneldə "Mərc etdim" (real mərclərin qeydi), canlı yenilənmə |
 | 6 | VPS-ə deploy, həftəlik hesabat, backup |
 
 LLM backtest edilmir: model keçmiş nəticələri "bilə" bilər, keçmiş zədə snapshot-ları da yoxdur. LLM-in faydası

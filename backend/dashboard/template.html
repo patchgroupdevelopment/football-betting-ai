@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Futbol Analiz Paneli</title>
+<style>
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f0f2f5; --text: #15181d; --muted: #5d6673;
+  --border: #dde1e7; --accent: #1f6feb; --accent-soft: #e3edfd; --good: #13804b; --good-soft: #e1f4ea;
+  --bad: #c2362f; --bad-soft: #fbe6e4; --warn: #9a6400; --warn-soft: #fbf0d9; --shadow: 0 1px 2px rgba(16,24,40,.06);
+  --radius: 10px; --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --surface: #171b21; --surface-2: #1e232b; --text: #e7eaee; --muted: #9aa4b2;
+    --border: #2a313b; --accent: #5b9cff; --accent-soft: #1b2a44; --good: #3fbf7f; --good-soft: #15301f;
+    --bad: #ff6b61; --bad-soft: #3a1b19; --warn: #e2a93b; --warn-soft: #362a12; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --surface: #171b21; --surface-2: #1e232b; --text: #e7eaee; --muted: #9aa4b2;
+  --border: #2a313b; --accent: #5b9cff; --accent-soft: #1b2a44; --good: #3fbf7f; --good-soft: #15301f;
+  --bad: #ff6b61; --bad-soft: #3a1b19; --warn: #e2a93b; --warn-soft: #362a12; --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.5 var(--font); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px 48px; }
+header { padding: 22px 0 12px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-end; justify-content: space-between; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+h2 { font-size: 17px; margin: 28px 0 10px; }
+h3 { font-size: 15px; margin: 0 0 8px; }
+.sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.meta { color: var(--muted); font-size: 13px; text-align: right; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--warn-soft); color: var(--warn); }
+nav { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; gap: 4px; overflow-x: auto; padding: 6px 0; }
+nav button { font: inherit; font-weight: 600; font-size: 14px; color: var(--muted); background: none; border: 0; padding: 8px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
+section[hidden] { display: none; }
+.grid { display: grid; gap: 12px; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.cards { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+.kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.kpi .value { font-size: 22px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kpi .hint { color: var(--muted); font-size: 12px; }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+.pick-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; }
+.rank { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 13px; margin-right: 6px; }
+.match-name { font-weight: 700; font-size: 16px; margin: 6px 0 2px; }
+.pick-label { font-size: 15px; font-weight: 600; color: var(--accent); }
+.odds-line { margin: 6px 0 10px; font-size: 14px; }
+.odds-line b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+.stats div { background: var(--surface-2); border-radius: 8px; padding: 6px 8px; }
+.stats span { display: block; color: var(--muted); font-size: 11px; }
+.stats strong { font-variant-numeric: tabular-nums; }
+ul.reasons { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+ul.reasons li { margin: 2px 0; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.notice { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 16px; color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; background: var(--surface-2); position: sticky; top: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+td.wrap-text { white-space: normal; min-width: 180px; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.chip.bet, .chip.won { background: var(--good-soft); color: var(--good); }
+.chip.watch, .chip.pending { background: var(--warn-soft); color: var(--warn); }
+.chip.no_bet, .chip.lost { background: var(--bad-soft); color: var(--bad); }
+.chip.void { background: var(--surface-2); color: var(--muted); }
+.chart-box { position: relative; height: 260px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.seg button { font: inherit; font-size: 13px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.progress { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+.progress > div { height: 100%; background: var(--accent); }
+footer { margin-top: 36px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 14px; }
+@media (max-width: 560px) {
+  .cards { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .meta { text-align: left; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title"></h1>
+      <div class="sub" id="subtitle"></div>
+    </div>
+    <div class="meta"><span id="generated"></span><br><span id="paper" class="badge" hidden></span></div>
+  </header>
+  <nav id="tabs" role="tablist"></nav>
+  <main id="main"></main>
+  <footer id="footer"></footer>
+</div>
+<script type="application/json" id="data">/*__DATA__*/null</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var D = JSON.parse(document.getElementById("data").textContent);
+  var L = D.labels;
+  var charts = [];
+
+  function el(tag, attrs) {
+    var node = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === "text") node.textContent = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) node.setAttribute(k, attrs[k]);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c === null || c === undefined || c === false) continue;
+      if (Array.isArray(c)) c.forEach(function (x) { if (x) node.appendChild(typeof x === "string" ? document.createTextNode(x) : x); });
+      else node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    }
+    return node;
+  }
+  function dash(v) { return v === null || v === undefined ? "—" : v; }
+  function pct(v, signed) { if (v === null || v === undefined) return "—"; return (signed && v > 0 ? "+" : "") + v.toFixed(1) + "%"; }
+  function frac(v, signed) { return v === null || v === undefined ? "—" : pct(v * 100, signed); }
+  function num(v, d) { return v === null || v === undefined ? "—" : Number(v).toFixed(d === undefined ? 2 : d); }
+  function signed(v, d) { if (v === null || v === undefined) return "—"; var s = Number(v).toFixed(d === undefined ? 2 : d); return v > 0 ? "+" + s : s; }
+  function money(v) { return v === null || v === undefined ? "—" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + L.azn; }
+  function cls(v) { return v > 0 ? "pos" : v < 0 ? "neg" : ""; }
+  function kpi(label, value, hint, klass) {
+    return el("div", { class: "card kpi" }, el("div", { class: "label", text: label }), el("div", { class: "value " + (klass || ""), text: value }), hint ? el("div", { class: "hint", text: hint }) : null);
+  }
+  function table(columns, rows, empty) {
+    if (!rows || !rows.length) return el("div", { class: "notice", text: empty || "—" });
+    var head = el("tr", null, columns.map(function (c) { return el("th", { class: c.num ? "num" : null, text: c.label }); }));
+    var body = rows.map(function (r) {
+      return el("tr", null, columns.map(function (c) {
+        var v = c.render ? c.render(r) : dash(r[c.key]);
+        var td = el("td", { class: [c.num ? "num" : "", c.wrap ? "wrap-text" : "", c.cls ? c.cls(r) : ""].join(" ").trim() || null });
+        if (v instanceof Node) td.appendChild(v); else td.textContent = v;
+        return td;
+      }));
+    });
+    return el("div", { class: "table-wrap" }, el("table", null, el("thead", null, head), el("tbody", null, body)));
+  }
+  function chip(code, label) { return el("span", { class: "chip " + code, text: label }); }
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function chart(canvasParent, config) {
+    if (!window.Chart) { canvasParent.remove(); return; }
+    var canvas = el("canvas");
+    canvasParent.appendChild(canvas);
+    Chart.defaults.color = cssVar("--muted");
+    Chart.defaults.borderColor = cssVar("--border");
+    Chart.defaults.font.family = cssVar("--font");
+    charts.push(new Chart(canvas, config));
+  }
+  function lineChart(points, label) {
+    var box = el("div", { class: "card" }, el("div", { class: "chart-box" }));
+    chart(box.firstChild, {
+      type: "line",
+      data: { labels: points.map(function (p) { return p[0]; }), datasets: [{ label: label, data: points.map(function (p) { return p[1]; }), borderColor: cssVar("--accent"), backgroundColor: cssVar("--accent-soft"), fill: true, pointRadius: 0, tension: .2 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 8 } } } }
+    });
+    return box;
+  }
+
+  // ------------------------------------------------------------- today
+  function pickCard(p) {
+    var stats = el("div", { class: "stats" },
+      el("div", null, el("span", { text: L.probability }), el("strong", { text: pct(p.p_final) })),
+      el("div", null, el("span", { text: L.fair_odds }), el("strong", { text: dash(p.fair_odds) })),
+      el("div", null, el("span", { text: L.ev }), el("strong", { class: cls(p.ev), text: pct(p.ev, true) })),
+      el("div", null, el("span", { text: L.confidence }), el("strong", { text: p.confidence === null ? "—" : p.confidence + "/100" })),
+      el("div", null, el("span", { text: L.market_probability }), el("strong", { text: pct(p.p_market) })),
+      el("div", null, el("span", { text: L.risk }), el("strong", { text: dash(p.risk_label) }))
+    );
+    var why = p.why && p.why.length ? el("div", null, el("h3", { text: L.why }), el("ul", { class: "reasons" }, p.why.map(function (w) { return el("li", { text: w }); }))) : null;
+    var against = p.against && p.against.length ? el("div", null, el("h3", { text: L.against }), el("ul", { class: "reasons" }, p.against.map(function (w) { return el("li", { text: w }); }))) : null;
+    return el("article", { class: "card" },
+      el("div", { class: "pick-head" }, el("span", null, p.rank ? el("span", { class: "rank", text: String(p.rank) }) : null, p.league), el("span", { text: p.time })),
+      el("div", { class: "match-name", text: p.home + " – " + p.away }),
+      el("div", { class: "pick-label", text: dash(p.pick) }),
+      el("div", { class: "odds-line" }, el("b", { text: num(p.odds) }), " · " + dash(p.bookmaker)),
+      stats, why, against,
+      el("div", { class: "note", text: L.best_price_note })
+    );
+  }
+  function renderToday(root) {
+    var t = D.today;
+    root.appendChild(el("h2", { text: t.date }));
+    root.appendChild(el("div", { class: "grid kpis" },
+      kpi(L.analyzed, String(t.total)), kpi(L.bets, String(t.counts.bet || 0), null, "pos"),
+      kpi(L.watch, String(t.counts.watch || 0)), kpi(L.no_bet, String(t.counts.no_bet || 0))));
+    root.appendChild(el("h2", { text: L.top_picks }));
+    if (!t.total) root.appendChild(el("div", { class: "notice", text: L.not_analyzed }));
+    else if (!t.picks.length) root.appendChild(el("div", { class: "notice", text: L.no_picks }));
+    else root.appendChild(el("div", { class: "grid cards" }, t.picks.map(pickCard)));
+    if (t.watch.length) {
+      root.appendChild(el("h2", { text: L.watch_list }));
+      root.appendChild(table([
+        { label: L.time, key: "time" }, { label: L.match, render: function (r) { return r.home + " – " + r.away; } },
+        { label: L.pick, key: "pick" }, { label: L.odds, num: true, render: function (r) { return num(r.odds); } },
+        { label: L.ev, num: true, render: function (r) { return pct(r.ev, true); }, cls: function (r) { return cls(r.ev); } },
+        { label: L.confidence, num: true, key: "confidence" }, { label: L.reason, key: "reason", wrap: true }
+      ], t.watch));
+    }
+    root.appendChild(el("h2", { text: L.all_matches }));
+    root.appendChild(table([
+      { label: L.time, key: "time" }, { label: L.league, key: "league" },
+      { label: L.match, render: function (r) { return r.home + " – " + r.away; } },
+      { label: L.decision, render: function (r) { return chip(r.decision, r.decision_label); } },
+      { label: L.pick, key: "pick" }, { label: L.odds, num: true, render: function (r) { return num(r.odds); } },
+      { label: L.ev, num: true, render: function (r) { return pct(r.ev, true); }, cls: function (r) { return cls(r.ev); } },
+      { label: L.confidence, num: true, key: "confidence" }, { label: L.reason, key: "reason", wrap: true }
+    ], t.matches, L.not_analyzed));
+  }
+
+  // ------------------------------------------------------------- results
+  function recordKpis(title, r) {
+    return el("div", { class: "card" }, el("h3", { text: title }),
+      el("div", { class: "stats" },
+        el("div", null, el("span", { text: L.settled }), el("strong", { text: r.bets + " (" + r.wins + "/" + r.losses + ")" })),
+        el("div", null, el("span", { text: L.hit_rate }), el("strong", { text: pct(r.hit_rate) })),
+        el("div", null, el("span", { text: L.roi }), el("strong", { class: cls(r.roi), text: pct(r.roi, true) })),
+        el("div", null, el("span", { text: L.profit }), el("strong", { class: cls(r.pnl), text: signed(r.pnl) })),
+        el("div", null, el("span", { text: L.clv }), el("strong", { class: cls(r.clv), text: pct(r.clv, true) })),
+        el("div", null, el("span", { text: L.pending }), el("strong", { text: String(r.pending) }))));
+  }
+  function renderResults(root) {
+    var r = D.results;
+    root.appendChild(el("h2", { text: L.live_record }));
+    root.appendChild(el("div", { class: "grid cards" }, recordKpis(L.all_picks, r.overall), recordKpis(L.top_only, r.top), recordKpis(L.last_30, r.recent)));
+    if (r.equity.length > 1) { root.appendChild(el("h2", { text: L.equity })); root.appendChild(lineChart(r.equity, L.profit)); }
+    root.appendChild(el("h2", { text: L.settled }));
+    root.appendChild(table([
+      { label: L.date, key: "date" }, { label: L.match, render: function (x) { return x.home + " – " + x.away; } },
+      { label: L.score, key: "score" }, { label: L.pick, key: "pick" },
+      { label: L.odds, num: true, render: function (x) { return num(x.odds); } },
+      { label: L.status, render: function (x) { return chip(x.status, L[x.status] || x.status); } },
+      { label: L.profit, num: true, render: function (x) { return signed(x.pnl); }, cls: function (x) { return cls(x.pnl); } },
+      { label: L.clv, num: true, render: function (x) { return pct(x.clv, true); } }
+    ], r.bets, L.no_results));
+  }
+
+  // ------------------------------------------------------------- pyramid
+  function renderPyramid(root) {
+    var p = D.pyramid;
+    root.appendChild(el("h2", { text: L.pyramid_state }));
+    var progress = p.balance > p.starting ? Math.min(100, 100 * Math.log(p.balance / p.starting) / Math.log(p.target / p.starting)) : 0;
+    root.appendChild(el("div", { class: "grid kpis" },
+      kpi(L.balance, money(p.balance), L.stage + " " + p.stage), kpi(L.target, money(p.target)),
+      kpi(L.attempt, String(p.attempt), L.total_staked + ": " + money(p.total_staked)),
+      kpi(L.locked, money(p.locked)), kpi(L.mode, p.mode),
+      kpi(L.stages_needed, dash(p.stages_needed), L.odds + " " + num(p.projection_odds))));
+    root.appendChild(el("div", { class: "card" }, el("div", { class: "progress" }, el("div", { style: "width:" + progress.toFixed(1) + "%" }))));
+    root.appendChild(el("h2", { text: L.ledger }));
+    root.appendChild(table([
+      { label: L.attempt, num: true, key: "attempt" }, { label: L.stage, num: true, key: "stage" },
+      { label: L.before, num: true, render: function (s) { return money(s.before); } },
+      { label: L.odds, num: true, render: function (s) { return num(s.odds); } },
+      { label: L.after, num: true, render: function (s) { return s.after === null ? "—" : money(s.after); } },
+      { label: L.locked, num: true, render: function (s) { return s.locked ? money(s.locked) : "—"; } },
+      { label: L.status, render: function (s) { return chip(s.status, L[s.status] || s.status); } }
+    ], p.stages, L.no_stages));
+  }
+
+  // ------------------------------------------------------------- backtest
+  function summaryKpis(s, median, baseline) {
+    return el("div", { class: "grid kpis" },
+      kpi(L.bets, String(s.bets), s.wins + " / " + s.losses),
+      kpi(L.hit_rate, frac(s.hit_rate), L.predicted + ": " + frac(s.expected_hit_rate)),
+      kpi(L.odds, num(s.avg_odds)),
+      kpi(L.roi, frac(s.roi, true), L.profit + ": " + signed(s.profit), cls(s.roi)),
+      kpi(L.clv, frac(s.avg_clv, true), null, cls(s.avg_clv)),
+      kpi(L.drawdown, num(s.max_drawdown) + " " + L.units, L.losing_streak + ": " + s.longest_losing_streak),
+      kpi(L.median_price, frac(median.roi, true), median.bets + " " + L.bets.toLowerCase(), cls(median.roi)),
+      kpi(L.baseline, frac(baseline.roi, true), baseline.bets + " " + L.bets.toLowerCase(), cls(baseline.roi)));
+  }
+  function groupTable(groups, names) {
+    var rows = Object.keys(groups || {}).map(function (k) { var g = groups[k]; return Object.assign({ name: (names && names[k]) || k }, g); });
+    return table([
+      { label: L.group, key: "name" }, { label: L.bets, num: true, key: "bets" },
+      { label: L.hit_rate, num: true, render: function (g) { return frac(g.hit_rate); } },
+      { label: L.odds, num: true, render: function (g) { return num(g.avg_odds); } },
+      { label: L.roi, num: true, render: function (g) { return frac(g.roi, true); }, cls: function (g) { return cls(g.roi); } },
+      { label: L.clv, num: true, render: function (g) { return frac(g.avg_clv, true); } }
+    ], rows);
+  }
+  function calibrationChart(cal) {
+    var box = el("div", { class: "card" }, el("div", { class: "chart-box" }));
+    var palette = { model: cssVar("--warn"), market: cssVar("--accent"), final: cssVar("--good") };
+    var datasets = ["model", "market", "final"].filter(function (k) { return cal[k] && cal[k].length; }).map(function (k) {
+      return { label: L[k], data: cal[k].map(function (b) { return { x: b.predicted * 100, y: b.actual * 100 }; }), borderColor: palette[k], backgroundColor: palette[k], showLine: true, tension: .1 };
+    });
+    datasets.push({ label: "", data: [{ x: 50, y: 50 }, { x: 90, y: 90 }], borderColor: cssVar("--border"), borderDash: [4, 4], pointRadius: 0, showLine: true });
+    chart(box.firstChild, { type: "scatter", data: { datasets: datasets }, options: { maintainAspectRatio: false,
+      plugins: { legend: { labels: { filter: function (i) { return i.text; } } } },
+      scales: { x: { title: { display: true, text: L.predicted + " %" }, min: 50, max: 90 }, y: { title: { display: true, text: L.actual + " %" }, min: 40, max: 100 } } } });
+    return box;
+  }
+  function pyramidCard(key, v) {
+    if (!v || !v.attempts) return el("div", { class: "card" }, el("h3", { text: L[key] }), el("div", { class: "note", text: "—" }));
+    var best = v.max_attempt;
+    var broke = (v.attempt_list || []).filter(function (a) { return a.number === best.number && a.broke_at; })[0];
+    var net = v.locked_total ? v.locked_total - v.invested : -v.invested;
+    return el("div", { class: "card" }, el("h3", { text: L[key] }),
+      el("div", { class: "odds-line" }, el("b", { text: money(v.max_balance) }), " · " + best.wins + " " + L.wins_in_row),
+      el("div", { class: "stats" },
+        el("div", null, el("span", { text: L.attempts }), el("strong", { text: String(v.attempts) })),
+        el("div", null, el("span", { text: L.invested }), el("strong", { text: money(v.invested) })),
+        el("div", null, el("span", { text: L.net }), el("strong", { class: cls(net), text: signed(net) + " " + L.azn }))),
+      v.locked_total ? el("div", { class: "note", text: L.locked + ": " + money(v.locked_total) }) : el("div", { class: "note", text: L.lost_all }),
+      broke ? el("div", { class: "note", text: L.broke_on + ": " + broke.broke_at.home + " – " + broke.broke_at.away + " " + broke.broke_at.score + " · " + broke.broke_at.pick + " (" + num(broke.broke_at.odds) + ") · " + money(broke.broke_at.balance_before) }) : null);
+  }
+  function renderBacktest(root) {
+    var b = D.backtest;
+    root.appendChild(el("h2", { text: L.backtest_title }));
+    if (!b) { root.appendChild(el("div", { class: "notice", text: L.backtest_missing })); return; }
+    var pr = b.params;
+    root.appendChild(el("div", { class: "card" },
+      el("div", null, el("strong", { text: L.period + ": " }), b.period.start + " – " + b.period.end + " · " + b.matches + " " + L.matches.toLowerCase() + " · " + b.leagues.length + " " + L.league.toLowerCase()),
+      el("div", null, el("strong", { text: L.rules + ": " }), L.model_weight + " " + frac(pr.model_weight) + " · " + L.min_ev + " " + frac(pr.min_ev) + " · " + L.min_confidence + " " + pr.min_confidence)));
+    root.appendChild(el("div", { style: "height:12px" }));
+    root.appendChild(summaryKpis(b.summary, b.median_price, b.baseline));
+    if (b.equity && b.equity.length > 1) { root.appendChild(el("h2", { text: L.equity })); root.appendChild(lineChart(b.equity, L.profit)); }
+
+    root.appendChild(el("h2", { text: L.pyramid_sim }));
+    var keys = ["daily_classic", "daily_milestone_lock", "chain_classic", "chain_milestone_lock"];
+    root.appendChild(el("div", { class: "grid cards" }, keys.map(function (k) { return pyramidCard(k, (b.pyramid || {})[k]); })));
+    var main = (b.pyramid || {}).daily_classic;
+    if (main && main.attempts) {
+      var hist = main.break_histogram || {};
+      var hbox = el("div", { class: "card" }, el("h3", { text: L.break_histogram + " · " + L.daily_classic }), el("div", { class: "chart-box" }));
+      chart(hbox.lastChild, { type: "bar", data: { labels: Object.keys(hist), datasets: [{ data: Object.values(hist), backgroundColor: cssVar("--bad") }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { precision: 0 } } } } });
+      root.appendChild(el("div", { style: "height:12px" }));
+      root.appendChild(hbox);
+      root.appendChild(el("h2", { text: L.best_path }));
+      root.appendChild(table([
+        { label: L.date, key: "day" }, { label: L.match, render: function (s) { return s.home + " – " + s.away; } },
+        { label: L.score, key: "score" }, { label: L.pick, key: "pick" },
+        { label: L.odds, num: true, render: function (s) { return num(s.odds); } },
+        { label: L.before, num: true, render: function (s) { return money(s.balance_before); } },
+        { label: L.after, num: true, render: function (s) { return money(s.balance_after); }, cls: function (s) { return s.balance_after > 0 ? "" : "neg"; } }
+      ], main.max_attempt.path));
+    }
+
+    root.appendChild(el("h2", { text: L.calibration }));
+    root.appendChild(calibrationChart(b.calibration || {}));
+    var scores = b.probability_scores || {};
+    root.appendChild(el("div", { style: "height:12px" }));
+    root.appendChild(table([{ label: L.brier, key: "name" }, { label: "Brier", num: true, key: "brier" }, { label: "Log loss", num: true, key: "log_loss" }, { label: L.matches, num: true, key: "matches" }],
+      ["model", "market", "final", "closing"].filter(function (k) { return scores[k]; }).map(function (k) { return Object.assign({ name: L[k] }, scores[k]); })));
+
+    var groups = [["by_market", b.market_names], ["by_league"], ["by_confidence"], ["by_odds"], ["by_bookmaker"], ["by_month"]];
+    root.appendChild(el("h2", { text: L.group }));
+    var seg = el("div", { class: "seg" });
+    var holder = el("div");
+    groups.forEach(function (g, i) {
+      var btn = el("button", { type: "button", "aria-pressed": i === 0 ? "true" : "false", text: L[g[0]] });
+      btn.addEventListener("click", function () {
+        Array.prototype.forEach.call(seg.children, function (x) { x.setAttribute("aria-pressed", "false"); });
+        btn.setAttribute("aria-pressed", "true");
+        holder.replaceChildren(groupTable(b[g[0]], g[1]));
+      });
+      seg.appendChild(btn);
+    });
+    holder.appendChild(groupTable(b.by_market, b.market_names));
+    root.appendChild(seg); root.appendChild(holder);
+
+    if (b.sweep) {
+      root.appendChild(el("h2", { text: L.sweep }));
+      root.appendChild(table([
+        { label: L.model_weight, num: true, render: function (r) { return frac(r.model_weight); } },
+        { label: L.min_ev, num: true, render: function (r) { return frac(r.min_ev); } },
+        { label: L.min_confidence, num: true, key: "min_confidence" },
+        { label: L.bets, num: true, key: "bets" },
+        { label: L.roi, num: true, render: function (r) { return frac(r.roi, true); }, cls: function (r) { return cls(r.roi); } },
+        { label: L.first_half, num: true, render: function (r) { return frac(r.first_roi, true); } },
+        { label: L.second_half, num: true, render: function (r) { return frac(r.second_roi, true); } },
+        { label: L.clv, num: true, render: function (r) { return frac(r.avg_clv, true); } },
+        { label: L.robust, render: function (r) { return r.robust ? chip("bet", "✓") : chip("void", "—"); } }
+      ], b.sweep.rows));
+    }
+    root.appendChild(el("h2", { text: L.bets }));
+    root.appendChild(table([
+      { label: L.date, key: "day" }, { label: L.league, key: "league" },
+      { label: L.match, render: function (x) { return x.home + " – " + x.away; } }, { label: L.score, key: "score" },
+      { label: L.pick, key: "pick" }, { label: L.odds, num: true, render: function (x) { return num(x.odds); } },
+      { label: L.bookmaker, key: "bookmaker" },
+      { label: L.status, render: function (x) { var s = x.outcome === "win" ? "won" : x.outcome === "loss" ? "lost" : "void"; return chip(s, L[s]); } },
+      { label: L.clv, num: true, render: function (x) { return frac(x.clv, true); } }
+    ], (b.bets || []).slice().reverse()));
+    root.appendChild(el("h2", { text: L.notes }));
+    root.appendChild(el("div", { class: "card" }, el("ul", { class: "reasons" }, (b.notes || []).map(function (n) { return el("li", { text: L["note_" + n] || n }); }))));
+  }
+
+  // ------------------------------------------------------------- system
+  function renderSystem(root) {
+    var s = D.system;
+    root.appendChild(el("h2", { text: L.system_runs }));
+    root.appendChild(table([{ label: L.group, render: function (r) { return L["kind_" + r.kind] || r.kind; } }, { label: L.status, key: "status" }, { label: L.date, key: "when" }], s.runs));
+    root.appendChild(el("div", { style: "height:12px" }));
+    root.appendChild(el("div", { class: "grid kpis" }, kpi(L.db_matches, s.matches.toLocaleString("en-US")), kpi(L.db_teams, s.teams.toLocaleString("en-US")), kpi(L.db_odds, s.odds.toLocaleString("en-US"))));
+  }
+
+  // ------------------------------------------------------------- shell
+  var TABS = [["today", L.tab_today, renderToday], ["results", L.tab_results, renderResults], ["pyramid", L.tab_pyramid, renderPyramid], ["backtest", L.tab_backtest, renderBacktest], ["system", L.tab_system, renderSystem]];
+  document.title = L.title;
+  document.getElementById("title").textContent = L.title;
+  document.getElementById("subtitle").textContent = L.subtitle;
+  document.getElementById("generated").textContent = L.generated + ": " + D.generated;
+  if (D.paper_mode) { var badge = document.getElementById("paper"); badge.hidden = false; badge.textContent = L.paper; }
+  document.getElementById("footer").textContent = L.disclaimer;
+  var nav = document.getElementById("tabs"), main = document.getElementById("main");
+  var sections = {};
+  TABS.forEach(function (tab) {
+    var btn = el("button", { role: "tab", type: "button", "aria-selected": "false", "data-tab": tab[0], text: tab[1] });
+    btn.addEventListener("click", function () { show(tab[0]); });
+    nav.appendChild(btn);
+    var section = el("section", { id: "tab-" + tab[0], hidden: "hidden" });
+    main.appendChild(section);
+    sections[tab[0]] = { section: section, render: tab[2], done: false };
+  });
+  function show(name) {
+    if (!sections[name]) name = "today";
+    Object.keys(sections).forEach(function (k) { sections[k].section.hidden = k !== name; });
+    Array.prototype.forEach.call(nav.children, function (b) { b.setAttribute("aria-selected", b.getAttribute("data-tab") === name ? "true" : "false"); });
+    var s = sections[name];
+    if (!s.done) { s.render(s.section); s.done = true; }
+    try { localStorage.setItem("tab", name); } catch (e) { /* storage unavailable */ }
+    if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+  }
+  var initial = location.hash.slice(1);
+  if (!initial) { try { initial = localStorage.getItem("tab") || ""; } catch (e) { initial = ""; } }
+  show(initial || "today");
+})();
+</script>
+</body>
+</html>

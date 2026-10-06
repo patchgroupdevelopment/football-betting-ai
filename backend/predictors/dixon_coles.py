@@ -17,9 +17,10 @@ Old matches are down-weighted exponentially (``half_life_days``).
 from __future__ import annotations
 
 import math
-from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+
+import numpy as np
 
 from backend.predictors.poisson import dixon_coles_tau
 
@@ -77,56 +78,60 @@ def fit_ratings(
         return TeamRatings(rho=default_rho)
 
     decay = math.log(2) / half_life_days
-    rows: list[tuple[int, int, float, float, float]] = []
-    for obs in observations:
-        home_target, away_target = _target_goals(obs, xg_weight)
-        rows.append((obs.home_id, obs.away_id, home_target, away_target, math.exp(-decay * max(0.0, obs.age_days))))
+    teams = sorted({obs.home_id for obs in observations} | {obs.away_id for obs in observations})
+    index = {team: i for i, team in enumerate(teams)}
+    n = len(teams)
+    home_idx = np.fromiter((index[o.home_id] for o in observations), dtype=np.int64, count=len(observations))
+    away_idx = np.fromiter((index[o.away_id] for o in observations), dtype=np.int64, count=len(observations))
+    targets = [_target_goals(o, xg_weight) for o in observations]
+    home_goals = np.fromiter((t[0] for t in targets), dtype=float, count=len(targets))
+    away_goals = np.fromiter((t[1] for t in targets), dtype=float, count=len(targets))
+    weight = np.exp(-decay * np.maximum(0.0, np.fromiter((o.age_days for o in observations), dtype=float)))
 
-    total_weight = sum(r[4] for r in rows)
-    mean_home = sum(r[2] * r[4] for r in rows) / total_weight
-    mean_away = sum(r[3] * r[4] for r in rows) / total_weight
+    total_weight = weight.sum()
+    mean_home = float((home_goals * weight).sum() / total_weight)
+    mean_away = float((away_goals * weight).sum() / total_weight)
     base = mean_away if mean_away > 0 else DEFAULT_BASE
     home_advantage = min(1.6, max(1.0, mean_home / mean_away)) if mean_away > 0 else DEFAULT_HOME_ADVANTAGE
-
-    counts: dict[int, int] = defaultdict(int)
-    for home, away, *_ in rows:
-        counts[home] += 1
-        counts[away] += 1
-    teams = list(counts)
-    attack = dict.fromkeys(teams, 1.0)
-    defence = dict.fromkeys(teams, 1.0)
     prior_goals = prior_matches * base * (1 + home_advantage) / 2
 
+    def per_team(idx: np.ndarray, values: np.ndarray) -> np.ndarray:
+        return np.bincount(idx, weights=values, minlength=n)
+
+    # Goals scored / conceded by each team never change between iterations.
+    scored = per_team(home_idx, weight * home_goals) + per_team(away_idx, weight * away_goals) + prior_goals
+    conceded = per_team(away_idx, weight * home_goals) + per_team(home_idx, weight * away_goals) + prior_goals
+    attack = np.ones(n)
+    defence = np.ones(n)
     for _ in range(max_iterations):
-        numerator = dict.fromkeys(teams, prior_goals)
-        denominator = dict.fromkeys(teams, prior_goals)
-        for home, away, home_goals, away_goals, weight in rows:
-            numerator[home] += weight * home_goals
-            denominator[home] += weight * base * home_advantage * defence[away]
-            numerator[away] += weight * away_goals
-            denominator[away] += weight * base * defence[home]
-        new_attack = {t: numerator[t] / denominator[t] for t in teams}
-
-        numerator = dict.fromkeys(teams, prior_goals)
-        denominator = dict.fromkeys(teams, prior_goals)
-        for home, away, home_goals, away_goals, weight in rows:
-            numerator[away] += weight * home_goals  # goals conceded by the away team
-            denominator[away] += weight * base * home_advantage * new_attack[home]
-            numerator[home] += weight * away_goals
-            denominator[home] += weight * base * new_attack[away]
-        new_defence = {t: numerator[t] / denominator[t] for t in teams}
-
-        change = max(
-            max(abs(new_attack[t] - attack[t]) for t in teams),
-            max(abs(new_defence[t] - defence[t]) for t in teams),
+        expected_for = (
+            per_team(home_idx, weight * base * home_advantage * defence[away_idx])
+            + per_team(away_idx, weight * base * defence[home_idx])
+            + prior_goals
         )
+        new_attack = scored / expected_for
+        expected_against = (
+            per_team(away_idx, weight * base * home_advantage * new_attack[home_idx])
+            + per_team(home_idx, weight * base * new_attack[away_idx])
+            + prior_goals
+        )
+        new_defence = conceded / expected_against
+        change = max(np.abs(new_attack - attack).max(), np.abs(new_defence - defence).max())
         attack, defence = new_attack, new_defence
         if change < tolerance:
             break
 
-    ratings = TeamRatings(attack, defence, base, home_advantage, default_rho, dict(counts))
+    counts = np.bincount(home_idx, minlength=n) + np.bincount(away_idx, minlength=n)
+    ratings = TeamRatings(
+        {t: float(attack[i]) for t, i in index.items()},
+        {t: float(defence[i]) for t, i in index.items()},
+        base,
+        home_advantage,
+        default_rho,
+        {t: int(counts[i]) for t, i in index.items()},
+    )
     if len(observations) >= MIN_MATCHES_FOR_RHO:
-        ratings = TeamRatings(attack, defence, base, home_advantage, _fit_rho(observations, ratings, decay), dict(counts))
+        ratings = replace(ratings, rho=_fit_rho(observations, ratings, decay))
     return ratings
 
 

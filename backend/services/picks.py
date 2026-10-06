@@ -156,3 +156,10 @@ def get_match_analysis(db: Database, match_id: int, tz: ZoneInfo) -> PickView | 
             .limit(1)
         )
         return _view(prediction, tz) if prediction else None
+
+
+def day_predictions(db: Database, day: date, tz: ZoneInfo) -> list[PickView]:
+    """The latest prediction of every match analysed for the day, by kick-off."""
+    with db.session() as session:
+        views = [_view(p, tz) for p in _latest_predictions(session, day)]
+    return sorted(views, key=lambda v: (v.kickoff_local, v.league, v.home))

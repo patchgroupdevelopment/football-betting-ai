@@ -14,6 +14,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from backend.config import PROJECT_ROOT, ConfigError, get_config, get_settings
@@ -32,6 +33,7 @@ from backend.presenters.formatters import (
     format_status,
     text_message,
 )
+from backend.presenters.backtest import format_backtest_report
 from backend.presenters.messages import MessageBuilder
 from backend.scheduler.jobs import next_daily_run
 from backend.services.errors import ProviderError
@@ -268,6 +270,31 @@ def cmd_send_today(container: AppContainer, args: argparse.Namespace) -> int:
     return _send(container, _analysis_message(container, args.date or local_today(container.tz)))
 
 
+def cmd_backtest(container: AppContainer, args: argparse.Namespace) -> int:
+    codes = {code.strip() for code in args.leagues.split(",") if code.strip()} if args.leagues else None
+    outcome = container.backtest_service().run(
+        months=args.months,
+        search=args.sweep or args.apply,
+        apply=args.apply,
+        save=not args.no_save,
+        codes=codes,
+        progress=lambda step: print(t(f"backtest.progress.{step}"), flush=True),
+    )
+    print()
+    _print(format_backtest_report(outcome.report))
+    return 0
+
+
+def cmd_dashboard(container: AppContainer, args: argparse.Namespace) -> int:
+    from backend.dashboard.build import build_site
+
+    day = args.date or local_today(container.tz)
+    out = Path(args.out) if Path(args.out).is_absolute() else PROJECT_ROOT / args.out
+    page = build_site(container.db, container.config, container.tz, day, out, paper_mode=container.settings.paper_mode)
+    print(t("cli.dashboard_built", path=page))
+    return 0
+
+
 def cmd_cache_purge(container: AppContainer, _args: argparse.Namespace) -> int:
     print(t("cli.cache_purged", count=container.cache.purge_expired()))
     return 0
@@ -290,6 +317,8 @@ COMMANDS: dict[str, Command] = {
     "send-test": cmd_send_test,
     "send-today": cmd_send_today,
     "cache-purge": cmd_cache_purge,
+    "backtest": cmd_backtest,
+    "dashboard": cmd_dashboard,
 }
 
 
@@ -321,6 +350,15 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("bot-poll", help=t("cli.help.bot_poll"))
     sub.add_parser("send-test", help=t("cli.help.send_test"))
     sub.add_parser("cache-purge", help=t("cli.help.cache_purge"))
+    backtest = sub.add_parser("backtest", help=t("cli.help.backtest"))
+    backtest.add_argument("--months", type=int, default=12, help=t("cli.help.months"))
+    backtest.add_argument("--sweep", action="store_true", help=t("cli.help.sweep"))
+    backtest.add_argument("--apply", action="store_true", help=t("cli.help.apply"))
+    backtest.add_argument("--leagues", help=t("cli.help.leagues_codes"))
+    backtest.add_argument("--no-save", action="store_true", help=t("cli.help.no_save"))
+    dashboard = sub.add_parser("dashboard", help=t("cli.help.dashboard"))
+    dashboard.add_argument("--out", default="site", help=t("cli.help.out"))
+    dashboard.add_argument("--date", type=_parse_date, help=t("cli.help.date"))
     return parser
 
 

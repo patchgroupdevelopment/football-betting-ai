@@ -1,4 +1,4 @@
-"""Runs the daily pipeline (ingestion → analysis) off the event loop and delivers its reports.
+"""Runs the daily pipeline (ingestion → settlement → analysis) off the event loop and delivers its reports.
 
 One run at a time: a scheduled run, a catch-up run and a manual /yenile cannot
 overlap. The scheduled daily analysis is de-duplicated per day, so a catch-up
@@ -15,11 +15,13 @@ from typing import TYPE_CHECKING, Literal
 
 from backend.presenters.formatters import format_daily_analysis, format_ingestion_report, text_message
 from backend.presenters.messages import MessageBuilder
+from backend.presenters.results import format_settlement
 from backend.services.analysis import AnalysisReport
 from backend.services.errors import ProviderError
 from backend.services.ingestion import IngestionReport
 from backend.services.notifications import mark_sent, was_sent
 from backend.services.picks import build_daily_analysis
+from backend.services.results import SettlementReport, track_record
 from backend.utils.timeutils import local_today
 
 if TYPE_CHECKING:
@@ -38,6 +40,7 @@ DAILY_JOB_ID = "daily_pipeline"
 class PipelineResult:
     ingestion: IngestionReport
     analysis: AnalysisReport | None
+    settlement: SettlementReport | None = None
 
 
 class PipelineRunner:
@@ -70,12 +73,19 @@ class PipelineRunner:
                 logger.error("Pipeline başlamadı: %s", exc.user_message)
                 await self._send(text_message(exc.user_message))
                 return None
+            settlement: SettlementReport | None = None
+            try:  # yesterday's results arrived with the ingestion: settle before analysing the new day
+                settlement = await asyncio.to_thread(self._container.run_settlement)
+            except Exception:
+                logger.exception("Nəticələrin hesablanmasında xəta")
             analysis: AnalysisReport | None = None
             try:
                 analysis = await asyncio.to_thread(self._container.run_analysis, day)
+                await asyncio.to_thread(self._container.open_pyramid_stage, day)
             except Exception:
                 logger.exception("Analiz mərhələsində xəta")
-            result = PipelineResult(ingestion, analysis)
+            result = PipelineResult(ingestion, analysis, settlement)
+            await self._deliver_results(settlement)
             await self._deliver(result, day, trigger)
             return result
 
@@ -104,6 +114,13 @@ class PipelineRunner:
             return
         if await self._send(await self.daily_analysis_message(day)):
             await asyncio.to_thread(mark_sent, self._container.db, dedup_key, "daily_analysis")
+
+    async def _deliver_results(self, settlement: SettlementReport | None) -> None:
+        """Every settled pick is reported once: a bet is settled only once."""
+        if settlement is None or not settlement.settled:
+            return
+        record = await asyncio.to_thread(track_record, self._container.db)
+        await self._send(format_settlement(settlement, record))
 
     async def _send(self, message: MessageBuilder) -> bool:
         if self.notifier is None:

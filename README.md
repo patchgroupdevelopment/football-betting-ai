@@ -13,9 +13,9 @@ Python backend, Telegram bot və veb interfeys.
 |---|---|---|
 | **1 — Təməl** | Konfiqurasiya, verilənlər bazası, API-Football klienti (retry, limit, cache), gündəlik yükləmə, məlumat tamlığı skoru, piramida, Telegram botu, CLI, veb API | ✅ Hazır |
 | **2 — Model və seçim** | Forma, ev/səfər, yorğunluq, motivasiya, zədə təsiri; Elo + Dixon-Coles; 11 market; marjasız bazar ehtimalı; dəyər üstünlüyü; əminlik; risk; TOP 3 / MƏRC YOXDUR; gündəlik analiz mesajı; paper mərclər | ✅ Hazır |
-| 3 — Nəticələr və backtest | Hesablaşma, statistika, CLV, 3/6/12 aylıq backtest, kalibrləmə | ⏳ |
+| **3 — Nəticələr və backtest** | Seçimlərin avtomatik hesablaşması, CLV, statistika, `/neticeler`; 12 aylıq walk-forward backtest (26 liqa, 8,000+ oyun), parametr kalibrləməsi, piramida simulyasiyası | ✅ Hazır |
 | 4 — LLM və canlı izləmə | Claude/OpenRouter analizi, "BU MƏRC NİYƏ UDUZA BİLƏR?", heyət və əmsal bildirişləri | ⏳ |
-| 5 — Dashboard | Tam veb idarə paneli | ⏳ |
+| **5 — Dashboard** | Statik veb panel (GitHub Pages): bu gün, nəticələr, piramida, backtest, sistem — [https://patchgroupdevelopment.github.io/football-betting-ai/](https://patchgroupdevelopment.github.io/football-betting-ai/) | ✅ Hazır |
 | 6 — Canlıya çıxış | VPS, həftəlik hesabat, backup | ⏳ |
 
 Arxitektura və qərarlar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -62,10 +62,24 @@ Bir proses üç işi görür:
 ### Seçimlər haqqında
 
 Sistem gündə ən çox 3 seçim verir və bu seçimlər fərqli oyunlardan olur. Seçim yalnız bu şərtlərin hamısı ödəndikdə verilir:
-əmsal 1.20–1.70 aralığındadır, dəyər üstünlüyü (EV) ən azı +3%-dir, əminlik ən azı 75-dir, risk yüksək deyil,
-məlumat kifayətdir, zədə vəziyyəti kritik deyil və model ilə bazar arasında 15 faiz bəndindən böyük ziddiyyət yoxdur.
-Yekun ehtimalın 40%-i modelə, 60%-i bazarın marjasız ehtimalına əsaslanır. Ona görə "MƏRC YOXDUR" tez-tez çıxacaq.
-Bu, sistemin ehtiyatla işlədiyini göstərir. Bütün parametrlər `config.yaml`-dadır və Mərhələ 3-dəki backtestlə kalibrlənəcək.
+əmsal 1.20–1.70 aralığındadır, ən yaxşı əmsal bazarın ədalətli (marjasız) qiymətindən aşağı deyil (EV ≥ 0), əminlik ən azı 55-dir,
+risk yüksək deyil, məlumat kifayətdir, zədə vəziyyəti kritik deyil və model ilə bazar arasında 15 faiz bəndindən böyük ziddiyyət yoxdur.
+Yekun ehtimalın 90%-i bazarın marjasız ehtimalına, 10%-i modelə əsaslanır. Bu qaydalar backtestlə seçilib (aşağıya bax).
+
+**Backtest nə göstərdi (06.10.2025 – 05.10.2026, 26 liqa, 8,246 oyun):**
+- Köhnə qaydalarla (EV ≥ 3%, əminlik ≥ 75) il ərzində **bir dənə də mərc** seçilməzdi.
+- Model bazardan dəqiq deyil (Brier: model 0.615, bazar 0.599). Model bazardan "daha çox" ehtimal verəndə nəticə bazarın dediyindən pis çıxır.
+  Ona görə ehtimalın əsası bazardır, model isə izah və "ziddiyyət" əyləci kimi işləyir.
+- Bazarın marjası **power** üsulu ilə çıxılır: proporsional üsul favoritləri sistematik aşağı qiymətləndirirdi (80%-lik favorit 88% qazanırdı).
+- Yeni qaydalarla: 127 mərc, 79.5% qazanma, orta əmsal 1.41, ROI +11.4%, bağlanış əmsalına qarşı üstünlük (CLV) +1.1%.
+  Real gözlənti ROI deyil, CLV-dir (~+1%): ROI eyni dövrdə seçildiyi üçün nikbindir.
+- ⚠️ Üstünlük **yalnız ən yaxşı əmsalı verən bukmekerdə** var. Adi bir bukmekerin əmsalı ilə nəticə zərərlidir.
+  Hər seçimdə bukmeker göstərilir — başqa yerdə daha aşağı əmsalla mərc etmək üstünlüyü aradan qaldırır.
+- Piramida (2 AZN-dən, gündə 1 mərhələ): klassik rejimdə ən yüksək nəticə 100.88 AZN olub (13 ardıcıl qələbə), sonra qırılıb; 17 cəhdə qoyulan
+  34 AZN-in hamısı itib. Qazanc kilidi rejimində 60.85 AZN kilidlənib (xalis +26.85 AZN). 10,000 AZN-ə heç bir variantda çatılmayıb.
+  Ona görə standart rejim `milestone_lock`-dur.
+
+Yenidən kalibrləmə: `python -m backend.cli backtest --sweep` (yalnız göstərir) və ya `--apply` (`config.yaml`-a yazır).
 
 VS Code-da: **Run and Debug** → "Sistemi işə sal".
 
@@ -75,8 +89,10 @@ Sistem GitHub-ın pulsuz serverlərində işləyir, kompüterin açıq olması l
 
 | İş | Vaxt | Nə edir |
 |---|---|---|
-| **Gündəlik analiz** (`.github/workflows/daily.yml`) | 08:00 və 15:00 (Bakı) | Pulsuz mənbələr + API-Football + analiz. Günün ilk işi Telegram-a "GÜNÜN FUTBOL ANALİZİ" göndərir, ikincisi yalnız yeniləyir. |
+| **Gündəlik analiz** (`.github/workflows/daily.yml`) | 08:00 və 15:00 (Bakı) | Pulsuz mənbələr + API-Football → dünənki seçimlərin hesablaşması (Telegram-a "NƏTİCƏLƏR") → analiz. Günün ilk işi "GÜNÜN FUTBOL ANALİZİ" göndərir, ikincisi yalnız yeniləyir. |
 | **Telegram əmrləri** (`.github/workflows/bot.yml`) | hər 15 dəqiqə | Gözləyən mesajlara cavab verir (`/bugun`, `/secimler`, `/oyun_12`…). Mesaj yoxdursa, bir neçə saniyəyə bitir. |
+| **Həftəlik backtest** (`.github/workflows/backtest.yml`) | bazar ertəsi 06:30 (Bakı) | Son 12 ayın backtesti; hesabat `/backtest` və veb paneldə görünür. Qaydaları dəyişmir. |
+| **Veb panel** (GitHub Pages) | hər gündəlik və həftəlik işdən sonra | [https://patchgroupdevelopment.github.io/football-betting-ai/](https://patchgroupdevelopment.github.io/football-betting-ai/) |
 
 - Bot əmrlərə **dərhal yox, 15–20 dəqiqə ərzində** cavab verir. GitHub-ın planlı işləri bəzən bir neçə dəqiqə gecikir.
 - Baza `state` budağında saxlanılır və hər işdən sonra yenilənir.
@@ -94,6 +110,8 @@ Sistem GitHub-ın pulsuz serverlərində işləyir, kompüterin açıq olması l
 | `/bugun` | Günün oyunları: məlumat tamlığı, əmsal vəziyyəti, qərar və `/oyun_ID` keçidi |
 | `/oyun_ID` | Bir oyunun ətraflı analizi (keçidə toxunmaq kifayətdir) |
 | `/piramida` | Piramida irəliləyişi və nəzəri yol |
+| `/neticeler` | Seçimlərin canlı nəticələri: qazanma faizi, ROI, CLV, son 30 gün, piramida |
+| `/backtest` | Son backtestin qısa hesabatı və piramida simulyasiyası |
 | `/status` | Sistem vəziyyəti, API limiti, növbəti yükləmə |
 | `/yenile` | Məlumatları indi yüklə |
 | `/komek` | Əmrlərin siyahısı |
@@ -115,6 +133,10 @@ python -m backend.cli leagues --country Azerbaijan
 python -m backend.cli send-test              # Telegram-a sınaq mesajı
 python -m backend.cli send-today             # günün oyunlarını Telegram-a göndər
 python -m backend.cli cache-purge
+python -m backend.cli backtest               # son 12 ayda yoxlama (hesabat bazaya yazılır)
+python -m backend.cli backtest --sweep       # + parametrlərin kalibrlənməsi (yalnız göstərir)
+python -m backend.cli backtest --apply       # + etibarlı qaydaları config.yaml-a yaz
+python -m backend.cli dashboard              # veb paneli site/index.html faylına yarat
 ```
 
 ## Konfiqurasiya
@@ -164,7 +186,7 @@ backend/
   database/        engine, sessiya, miqrasiyalar
   models/          cədvəllər (22 cədvəl)
   schemas/         API cavablarının tipli modelləri
-  services/        API klienti, cache, yükləmə, piramida, icmal, status
+  services/        API klienti, cache, yükləmə, piramida, icmal, status, nəticələrin hesablaşması
   services/external/  pulsuz mənbələr: football-data.co.uk, football-data.org, ad uyğunlaşdırma
   analyzers/       forma, ev/səfər, yorğunluq, motivasiya, zədə təsiri, H2H, məlumat tamlığı
   predictors/      Dixon-Coles, Elo, market ehtimalları, bazar konsensusu
@@ -174,7 +196,9 @@ backend/
   scheduler/       cədvəl və pipeline
   api/             veb API
   i18n/az.py       istifadəçiyə görünən BÜTÜN mətnlər
-  llm/ backtest/   sonrakı mərhələlər
+  backtest/        walk-forward backtest, metrikalar, kalibrləmə, piramida simulyasiyası
+  dashboard/       statik veb panel (GitHub Pages)
+  llm/             sonrakı mərhələ
 alembic/           verilənlər bazası miqrasiyaları
 tests/             testlər
 ```

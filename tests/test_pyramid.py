@@ -95,3 +95,10 @@ def test_milestone_lock(db):
     service.open_stage(1.5)  # 40 -> 60 crosses 50: half is locked
     state = service.settle_stage(StageStatus.WON)
     assert state.balance == 30.0 and state.locked_total == 30.0
+
+    # Crossing the same milestone again (30 -> 45 -> 67.50) must not lock a second time.
+    service.open_stage(1.5)
+    service.settle_stage(StageStatus.WON)
+    service.open_stage(1.5)
+    state = service.settle_stage(StageStatus.WON)
+    assert state.balance == 67.5 and state.locked_total == 30.0

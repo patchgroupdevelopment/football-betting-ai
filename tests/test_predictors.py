@@ -9,7 +9,7 @@ import pytest
 
 from backend.predictors.dixon_coles import MatchObservation, fit_ratings
 from backend.predictors.elo import compute_ratings, expected_score, goal_difference_multiplier, outcome_probabilities
-from backend.predictors.market_odds import OddsQuote, build_market
+from backend.predictors.market_odds import OddsQuote, build_market, remove_margin
 from backend.predictors.markets import GoalModel, is_half_line
 from backend.predictors.poisson import count_over_probability, negbin_pmf, poisson_pmf, score_matrix
 
@@ -147,8 +147,19 @@ def test_market_consensus_removes_margin_and_finds_best_price():
     total = sum(market[("1X2", s, None)].fair_probability for s in ("1", "X", "2"))
     assert total == pytest.approx(1.0)
     over = market[("OU", "OVER", 2.5)]
-    assert over.best_odds == 2.05 and over.fair_probability == pytest.approx((1 / 1.90) / (1 / 1.90 + 1 / 1.95))
+    assert over.best_odds == 2.05 and over.fair_probability == pytest.approx(remove_margin([1.90, 1.95])[0])
+    assert over.median_odds == pytest.approx(1.975)
     assert ("DC", "1X", None) not in market  # double chance appears only when a bookmaker quotes it
+
+
+def test_power_margin_removal_leaves_more_probability_to_favourites():
+    prices = [1.30, 5.50, 9.00]
+    power = remove_margin(prices)
+    inverse = [1 / p for p in prices]
+    proportional = [x / sum(inverse) for x in inverse]
+    assert sum(power) == pytest.approx(1.0)
+    assert power[0] > proportional[0] and power[2] < proportional[2]  # favourite–longshot bias
+    assert remove_margin([2.0, 2.0]) == pytest.approx([0.5, 0.5])
 
 
 def test_double_chance_and_handicap_consensus():

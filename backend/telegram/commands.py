@@ -12,6 +12,7 @@ import asyncio
 import logging
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from backend.i18n import t
@@ -24,9 +25,13 @@ from backend.presenters.formatters import (
     format_welcome,
     text_message,
 )
+from backend.backtest.service import latest_report
+from backend.presenters.backtest import format_backtest_report
 from backend.presenters.messages import MessageBuilder
+from backend.presenters.results import format_track_record
 from backend.services.overview import build_daily_overview
 from backend.services.picks import get_match_analysis
+from backend.services.results import track_record
 from backend.services.system_status import collect_status
 from backend.services.users import register_user
 from backend.utils.timeutils import local_now, local_today
@@ -70,6 +75,17 @@ def authorization_reply(container: AppContainer, chat_id: int) -> MessageBuilder
     return None
 
 
+def track_record_message(container: AppContainer) -> MessageBuilder:
+    today = local_today(container.tz)
+    return format_track_record(
+        track_record(container.db),
+        track_record(container.db, top_only=True),
+        track_record(container.db, since=today - timedelta(days=30)),
+        container.pyramid_service().get_state(),
+        latest_report(container.db),
+    )
+
+
 async def respond(container: AppContainer, runner: PipelineRunner, incoming: Incoming) -> MessageBuilder:
     denied = authorization_reply(container, incoming.chat_id)
     if denied is not None:
@@ -98,6 +114,11 @@ async def respond(container: AppContainer, runner: PipelineRunner, incoming: Inc
         service = container.pyramid_service()
         state = await asyncio.to_thread(service.get_state)
         return format_pyramid(state, service.projection(state), paper_mode=container.settings.paper_mode)
+    if command == "neticeler":
+        return await asyncio.to_thread(track_record_message, container)
+    if command == "backtest":
+        report = await asyncio.to_thread(latest_report, container.db)
+        return format_backtest_report(report, detailed=False)
     if command == "status":
         from backend.scheduler.jobs import next_daily_run  # local: the scheduler imports the bot modules
 
