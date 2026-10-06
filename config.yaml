@@ -101,7 +101,11 @@ external_data:
 llm:
   enabled: true
   reviewers: [gemini, anthropic]      # açarı olanlar işləyir
-  gemini_model: gemini-2.5-flash      # pulsuz planda mövcud olan model
+  # Gemini iki mərhələdə işləyir: pulsuz planda Google axtarışı yalnız 2.5 Flash-da var, güclü 3.x modellər
+  # isə axtarışsız pulsuzdur. 1) gemini_search_model xəbərləri mənbə ilə tapır, 2) gemini_models siyahısından
+  # ilk əlçatan (məşğul olmayan) model təhlil edib qərar yazır.
+  gemini_models: [gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash, gemini-2.5-flash]
+  gemini_search_model: gemini-2.5-flash
   anthropic_model: claude-sonnet-5-5  # daha güclü: claude-opus-5-5 (bahadır), daha ucuz: claude-haiku-4-5
   web_search: true                    # son xəbərləri axtarsın (mənbə linkləri ilə)
   max_searches: 3                     # Claude üçün bir seçimdə maksimum axtarış

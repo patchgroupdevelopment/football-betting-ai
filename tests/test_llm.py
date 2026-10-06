@@ -126,24 +126,46 @@ def test_prompt_contains_the_facts_and_rules():
 # ------------------------------------------------------------------ providers over HTTP
 
 
-def test_gemini_provider_uses_search_and_returns_sources():
-    seen = {}
+def _gemini_answer(text: str, chunks: list | None = None) -> httpx.Response:
+    candidate = {"content": {"parts": [{"text": "düşünürəm", "thought": True}, {"text": text}]}}
+    if chunks:
+        candidate["groundingMetadata"] = {"groundingChunks": chunks}
+    return httpx.Response(200, json={"candidates": [candidate]})
+
+
+def test_gemini_researches_with_search_then_the_strongest_free_model_answers():
+    calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen["key"] = request.headers.get("x-goog-api-key")
-        seen["body"] = json.loads(request.content)
-        seen["path"] = request.url.path
-        return httpx.Response(200, json={"candidates": [{
-            "content": {"parts": [{"text": "düşünürəm", "thought": True}, {"text": json.dumps(ANSWER)}]},
-            "groundingMetadata": {"groundingChunks": [{"web": {"uri": "https://x/1", "title": "espn.com"}}]},
-        }]})
+        body = json.loads(request.content)
+        model = request.url.path.rsplit("/", 1)[-1].split(":")[0]
+        calls.append((model, "tools" in body, body["contents"][0]["parts"][0]["text"]))
+        assert request.headers.get("x-goog-api-key") == "g-key"
+        if "tools" in body:  # research step
+            return _gemini_answer("- Home striker ruled out (injury).", [{"web": {"uri": "https://x/1", "title": "espn.com"}}])
+        if model == "gemini-3.8-flash":
+            return httpx.Response(503, text="high demand")  # busy: the next model is tried
+        return _gemini_answer(json.dumps(ANSWER))
 
-    provider = GeminiProvider("g-key", "gemini-2.5-flash", transport=httpx.MockTransport(handler))
+    provider = GeminiProvider(
+        "g-key", ["gemini-3.8-flash", "gemini-3.6-flash"], search_model="gemini-2.5-flash",
+        transport=httpx.MockTransport(handler),
+    )
     reply = provider.ask("sys", "prompt")
-    assert seen["key"] == "g-key" and seen["path"].endswith("gemini-2.5-flash:generateContent")
-    assert seen["body"]["tools"] == [{"google_search": {}}]
+    assert calls[0][:2] == ("gemini-2.5-flash", True)  # only the research step searches
+    assert [c[:2] for c in calls[1:]] == [("gemini-3.8-flash", False), ("gemini-3.6-flash", False)]
+    assert "Home striker ruled out" in calls[2][2]  # the analyst sees the sourced news
     assert json.loads(reply.text)["verdict"] == "against"  # thought parts are skipped
-    assert reply.sources == (Source("espn.com", "https://x/1"),)
+    assert reply.sources == (Source("espn.com", "https://x/1"),) and reply.model == "gemini-3.6-flash"
+
+
+def test_gemini_without_news_has_no_sources():
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        return _gemini_answer("NO RELEVANT NEWS" if "tools" in body else json.dumps(ANSWER))
+
+    reply = GeminiProvider("k", ["m1"], search_model="s", transport=httpx.MockTransport(handler)).ask("s", "p")
+    assert reply.sources == ()  # → no news and no veto can pass
 
 
 def test_gemini_quota_error_is_reported_as_rate_limit():

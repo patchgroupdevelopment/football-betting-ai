@@ -100,7 +100,9 @@ class AiReview:
         )
 
 
-def parse_review(provider: Provider, text: str, sources: tuple[Source, ...], max_pp: float) -> AiReview:
+def parse_review(
+    provider: Provider, text: str, sources: tuple[Source, ...], max_pp: float, model: str | None = None
+) -> AiReview:
     try:
         answer = _Answer.model_validate(extract_json(text))
     except (ValueError, ValidationError) as exc:
@@ -109,7 +111,7 @@ def parse_review(provider: Provider, text: str, sources: tuple[Source, ...], max
     return AiReview(
         provider=provider.name,
         label=provider.label,
-        model=provider.model,
+        model=model or provider.model,
         verdict=answer.verdict,
         adjustment_pp=max(-max_pp, min(max_pp, answer.adjustment_pp)),
         veto=answer.veto,
@@ -193,7 +195,7 @@ class AiReviewService:
             if cached is not None:
                 return AiReview.from_dict(cached)
         reply = provider.ask(system, prompt)
-        review = parse_review(provider, reply.text, reply.sources, self.max_pp)
+        review = parse_review(provider, reply.text, reply.sources, self.max_pp, reply.model)
         if self.cache is not None and self.cache_seconds > 0:
             self.cache.set(endpoint, params, review.to_dict(), self.cache_seconds)
         return review

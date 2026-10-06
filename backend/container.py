@@ -82,7 +82,10 @@ class AppContainer:
         claude_key = self.settings.claude_api_key.get_secret_value()
         if "gemini" in cfg.reviewers and gemini_key:
             providers.append(
-                GeminiProvider(gemini_key, cfg.gemini_model, web_search=cfg.web_search, timeout=cfg.timeout_seconds)
+                GeminiProvider(
+                    gemini_key, cfg.gemini_models, search_model=cfg.gemini_search_model,
+                    web_search=cfg.web_search, timeout=cfg.timeout_seconds,
+                )
             )
         if "anthropic" in cfg.reviewers and claude_key:
             providers.append(

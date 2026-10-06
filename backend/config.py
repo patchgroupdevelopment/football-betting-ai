@@ -200,7 +200,11 @@ class LlmConfig(BaseModel):
 
     enabled: bool = False
     reviewers: list[Literal["gemini", "anthropic"]] = Field(default_factory=lambda: ["gemini", "anthropic"])
-    gemini_model: str = "gemini-2.5-flash"
+    # Analysis: the first available of these (free tier, no search). Research: search_model with Google Search.
+    gemini_models: list[str] = Field(
+        default_factory=lambda: ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"]
+    )
+    gemini_search_model: str = "gemini-2.5-flash"
     anthropic_model: str = "claude-sonnet-5-5"
     web_search: bool = True
     max_searches: int = Field(3, ge=1, le=10)
