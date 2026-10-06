@@ -8,7 +8,7 @@ from backend.presenters.labels import selection_label
 from backend.presenters.messages import MessageBuilder, bold
 from backend.services.price_checks import BookmakerStats
 from backend.services.pyramid import PyramidState
-from backend.services.results import SettlementReport, TrackRecord
+from backend.services.results import AiRecord, SettlementReport, TrackRecord
 from backend.utils.formatting import format_money, format_odds, format_percent, format_signed_percent
 
 STATUS_ICONS = {BetStatus.WON: "✅", BetStatus.LOST: "❌", BetStatus.VOID: "↩️"}
@@ -77,6 +77,7 @@ def format_track_record(
     state: PyramidState,
     backtest: dict | None,
     prices: BookmakerStats | None = None,
+    ai: AiRecord | None = None,
 ) -> MessageBuilder:
     msg = MessageBuilder()
     msg.line(bold(t("results.stats_title")))
@@ -105,6 +106,17 @@ def format_track_record(
                 checks=prices.checks,
                 gap=format_signed_percent(prices.gap_to_fair, 1) if prices.gap_to_fair is not None else "—",
                 passed=prices.passed,
+            )
+        )
+    if ai is not None and ai.reviewed:
+        msg.line(
+            t(
+                "ai.record",
+                reviewed=ai.reviewed,
+                vetoed=ai.vetoed,
+                lost=ai.vetoed_lost,
+                won=ai.vetoed_won,
+                effect=f"{ai.effect:+.2f}",
             )
         )
     if backtest and backtest.get("summary", {}).get("bets"):

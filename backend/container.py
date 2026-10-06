@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 from backend.backtest.service import BacktestService
 from backend.config import PROJECT_ROOT, AppConfig, Settings, get_config, get_settings
 from backend.database.session import Database
+from backend.llm.providers import ClaudeProvider, GeminiProvider, Provider
+from backend.llm.review import AiReviewService
 from backend.services.analysis import AnalysisReport, AnalysisService
 from backend.services.cache import ResponseCache
 from backend.services.external.football_data_couk import FootballDataCoUk
@@ -70,8 +72,37 @@ class AppContainer:
         report.external = external
         return report
 
+    def ai_reviewer(self) -> AiReviewService | None:
+        """None when AI review is off or no reviewer has a key."""
+        cfg = self.config.llm
+        if not cfg.enabled:
+            return None
+        providers: list[Provider] = []
+        gemini_key = self.settings.gemini_api_key.get_secret_value()
+        claude_key = self.settings.claude_api_key.get_secret_value()
+        if "gemini" in cfg.reviewers and gemini_key:
+            providers.append(
+                GeminiProvider(gemini_key, cfg.gemini_model, web_search=cfg.web_search, timeout=cfg.timeout_seconds)
+            )
+        if "anthropic" in cfg.reviewers and claude_key:
+            providers.append(
+                ClaudeProvider(
+                    claude_key, cfg.anthropic_model, web_search=cfg.web_search,
+                    max_searches=cfg.max_searches, timeout=cfg.timeout_seconds,
+                )
+            )
+        if not providers:
+            return None
+        return AiReviewService(
+            providers,
+            max_pp=self.config.model.llm_max_adjustment_pp,
+            max_reviews=cfg.max_reviews,
+            cache=self.cache,
+            cache_seconds=int(cfg.cache_hours * 3600),
+        )
+
     def run_analysis(self, day: date) -> AnalysisReport:
-        return AnalysisService(self.db, self.config, self.tz).run_daily(day)
+        return AnalysisService(self.db, self.config, self.tz, reviewer=self.ai_reviewer()).run_daily(day)
 
     @property
     def daily_cutoff(self) -> str:

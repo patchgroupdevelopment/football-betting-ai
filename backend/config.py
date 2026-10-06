@@ -195,6 +195,20 @@ class ExternalDataConfig(BaseModel):
     football_data_couk: FootballDataCoUkConfig = Field(default_factory=FootballDataCoUkConfig)
 
 
+class LlmConfig(BaseModel):
+    """AI reviewers of the day's picks (a brake, never the decision maker)."""
+
+    enabled: bool = False
+    reviewers: list[Literal["gemini", "anthropic"]] = Field(default_factory=lambda: ["gemini", "anthropic"])
+    gemini_model: str = "gemini-2.5-flash"
+    anthropic_model: str = "claude-sonnet-5-5"
+    web_search: bool = True
+    max_searches: int = Field(3, ge=1, le=10)
+    max_reviews: int = Field(5, ge=0, le=10)  # picks reviewed per analysis run
+    cache_hours: float = Field(8, ge=0)
+    timeout_seconds: float = Field(120, gt=0)
+
+
 class AppConfig(BaseModel):
     bankroll: BankrollConfig = Field(default_factory=BankrollConfig)
     selection: SelectionConfig = Field(default_factory=SelectionConfig)
@@ -206,6 +220,7 @@ class AppConfig(BaseModel):
     cache_ttl_seconds: CacheTtlConfig = Field(default_factory=CacheTtlConfig)
     schedule: ScheduleConfig = Field(default_factory=ScheduleConfig)
     external_data: ExternalDataConfig = Field(default_factory=ExternalDataConfig)
+    llm: LlmConfig = Field(default_factory=LlmConfig)
     leagues: list[LeagueConfig] = Field(default_factory=list)
 
     @field_validator("leagues")
@@ -235,12 +250,9 @@ class Settings(BaseSettings):
     football_data_org_key: SecretStr = SecretStr("")
     odds_api_key: SecretStr = SecretStr("")
 
-    llm_enabled: bool = False
-    llm_provider: Literal["anthropic", "openrouter"] = "anthropic"
+    # AI reviewers (config.yaml → llm): each one works when its key is set.
+    gemini_api_key: SecretStr = SecretStr("")
     claude_api_key: SecretStr = SecretStr("")
-    openrouter_api_key: SecretStr = SecretStr("")
-    model_name: str = "claude-opus-5-5"
-    llm_light_model: str = "claude-haiku-4-5"
 
     telegram_enabled: bool = True
     telegram_bot_token: SecretStr = SecretStr("")

@@ -14,7 +14,8 @@ Python backend, Telegram bot və veb interfeys.
 | **1 — Təməl** | Konfiqurasiya, verilənlər bazası, API-Football klienti (retry, limit, cache), gündəlik yükləmə, məlumat tamlığı skoru, piramida, Telegram botu, CLI, veb API | ✅ Hazır |
 | **2 — Model və seçim** | Forma, ev/səfər, yorğunluq, motivasiya, zədə təsiri; Elo + Dixon-Coles; 11 market; marjasız bazar ehtimalı; dəyər üstünlüyü; əminlik; risk; TOP 3 / MƏRC YOXDUR; gündəlik analiz mesajı; paper mərclər | ✅ Hazır |
 | **3 — Nəticələr və backtest** | Seçimlərin avtomatik hesablaşması, CLV, statistika, `/neticeler`; 12 aylıq walk-forward backtest (26 liqa, 8,000+ oyun), parametr kalibrləməsi, piramida simulyasiyası | ✅ Hazır |
-| 4 — LLM və canlı izləmə | Claude/OpenRouter analizi, "BU MƏRC NİYƏ UDUZA BİLƏR?", heyət və əmsal bildirişləri | ⏳ |
+| **4 — AI rəyi** | Günün seçimlərinə Gemini (pulsuz) və Claude ayrıca baxır, son xəbərləri axtarır (mənbə linkləri ilə); AI yalnız əyləcdir | ✅ Hazır (açarlar lazımdır) |
+| 4b — Canlı izləmə | Heyət və əmsal bildirişləri | ⏳ |
 | **5 — Dashboard** | Statik veb panel (GitHub Pages): bu gün, nəticələr, piramida, backtest, sistem — [https://patchgroupdevelopment.github.io/football-betting-ai/](https://patchgroupdevelopment.github.io/football-betting-ai/) | ✅ Hazır |
 | 6 — Canlıya çıxış | VPS, həftəlik hesabat, backup | ⏳ |
 
@@ -40,7 +41,8 @@ python -m backend.cli init-db
 | `TELEGRAM_BOT_TOKEN` | Telegram üçün | Telegram-da **@BotFather** → `/newbot` |
 | `TELEGRAM_CHAT_ID` | Telegram üçün | Boş saxlayın, sistemi işə salın və bota `/start` yazın — bot chat ID-nizi göndərəcək |
 | `ODDS_API_KEY` | Sonrakı mərhələ | [the-odds-api.com](https://the-odds-api.com) |
-| `CLAUDE_API_KEY` / `OPENROUTER_API_KEY` | Sonrakı mərhələ | console.anthropic.com / openrouter.ai |
+| `GEMINI_API_KEY` | AI rəyi üçün (pulsuz) | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| `CLAUDE_API_KEY` | AI rəyi üçün (pulludur) | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) |
 
 `.env` faylı git-ə göndərilmir (`.gitignore`-dadır). Açarlar yalnız backenddə istifadə olunur.
 
@@ -79,6 +81,12 @@ Yekun ehtimalın 90%-i bazarın marjasız ehtimalına, 10%-i modelə əsaslanır
   34 AZN-in hamısı itib. Qazanc kilidi rejimində 60.85 AZN kilidlənib (xalis +26.85 AZN). 10,000 AZN-ə heç bir variantda çatılmayıb.
   Ona görə standart rejim `milestone_lock`-dur.
 
+**AI rəyi** (`config.yaml` → `llm`): günün ən yaxşı seçimlərinə (5-ə qədər) Gemini və Claude ayrıca baxır, son 7 günün xəbərlərini axtarır
+(zədə, rotasiya, məşqçi, motivasiya). Qaydalar: AI ehtimalı yalnız **azalda** bilər (iki rəyin ortalaması, ən çox 4 f.b.),
+mənbəli xəbərlə **veto** edə bilər (o biri AI dəstəkləmirsə); EV və qərarı yenə sistem hesablayır. Mənbəsiz xəbər göstərilmir.
+Hər seçim üçün "yalnız model" qərarı da saxlanılır — `/neticeler` AI-ın blokladığı seçimlərin real nəticəsini göstərir.
+Açarı olmayan AI işləmir; hər ikisi yoxdursa sistem AI-sız davam edir.
+
 Yenidən kalibrləmə: `python -m backend.cli backtest --sweep` (yalnız göstərir) və ya `--apply` (`config.yaml`-a yazır).
 
 **Misli.az ilə mərc** (`config.yaml` → `selection.user_bookmaker`): hər seçimdə "Misli.az-da əmsal ən azı X olmalıdır" yazılır
@@ -104,7 +112,7 @@ Sistem GitHub-ın pulsuz serverlərində işləyir, kompüterin açıq olması l
 - Bot əmrlərə **dərhal yox, 15–20 dəqiqə ərzində** cavab verir. GitHub-ın planlı işləri bəzən bir neçə dəqiqə gecikir.
 - Baza `state` budağında saxlanılır və hər işdən sonra yenilənir.
 - Açarlar repo **Settings → Secrets and variables → Actions** bölməsində saxlanılır:
-  `FOOTBALL_API_KEY`, `FOOTBALL_DATA_ORG_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+  `FOOTBALL_API_KEY`, `FOOTBALL_DATA_ORG_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY`, `CLAUDE_API_KEY`.
 - İşi əl ilə başlatmaq: repo → **Actions** → iş → **Run workflow**.
 - ⚠️ GitHub rejimi işləyərkən kompüterdə `python -m backend.main`-i **Telegram ilə işə salmayın**: eyni botun mesajlarını iki yer paylaşa bilməz.
   Lokal sınaq üçün `.env`-də `TELEGRAM_ENABLED=false` yazın.
@@ -207,7 +215,7 @@ backend/
   i18n/az.py       istifadəçiyə görünən BÜTÜN mətnlər
   backtest/        walk-forward backtest, metrikalar, kalibrləmə, piramida simulyasiyası
   dashboard/       statik veb panel (GitHub Pages)
-  llm/             sonrakı mərhələ
+  llm/             AI rəyi: Gemini və Claude provayderləri, prompt, əyləc qaydası
 alembic/           verilənlər bazası miqrasiyaları
 tests/             testlər
 ```

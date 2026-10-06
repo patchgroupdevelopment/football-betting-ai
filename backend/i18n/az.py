@@ -148,6 +148,9 @@ RUN_STATUSES: dict[str, str] = {
 DATA_QUALITY_LEVELS: dict[str, str] = {"full": "Tam", "partial": "Qismən", "low": "Natamam"}
 DATA_QUALITY_ICONS: dict[str, str] = {"full": "🟢", "partial": "🟡", "low": "🔴"}
 
+AI_VERDICTS: dict[str, str] = {"support": "dəstəkləyir", "neutral": "neytral", "against": "əleyhinə"}
+AI_VERDICT_ICONS: dict[str, str] = {"support": "✅", "neutral": "➖", "against": "⚠️"}
+
 PYRAMID_MODES: dict[str, str] = {"classic": "Klassik", "milestone_lock": "Qazanc kilidi"}
 
 FORM_LETTERS: dict[str, str] = {"W": "Q", "D": "H", "L": "M"}  # qələbə / heç-heçə / məğlubiyyət
@@ -192,6 +195,7 @@ FACTOR_NAMES: dict[str, str] = {
 
 NO_BET_REASONS: dict[str, str] = {
     "low_data": "kifayət qədər məlumat yoxdur",
+    "ai_veto": "AI son xəbərlərə (mənbə ilə) əsasən əleyhinədir",
     "no_odds": "əmsal yoxdur",
     "no_market_in_range": "əmsal aralığında uyğun market yoxdur",
     "model_market_conflict": "model ilə bazar arasında böyük ziddiyyət var",
@@ -555,6 +559,19 @@ MESSAGES: dict[str, str] = {
     "pyramid.error_no_pending": "Nəticəsi gözlənilən mərhələ yoxdur.",
     "pyramid.error_bad_odds": "Əmsal 1.00 rəqəmindən böyük olmalıdır.",
     "pyramid.error_target_reached": "Hədəfə artıq çatılıb. Yeni cəhd üçün piramidanı sıfırlayın.",
+    # AI reviewers
+    "ai.title": "🤖 AI RƏYİ",
+    "analysis_run.ai": "🤖 AI rəyi: {reviewed} seçimə baxıldı, {vetoed} bloklandı",
+    "ai.review": "{icon} {label}: {verdict} — {summary}",
+    "ai.risks": "Risklər:",
+    "ai.news": "📰 Son xəbərlər:",
+    "ai.sources": "🔗 Mənbələr: {sources}",
+    "ai.adjusted": "🔻 AI düzəlişi: {pp} f.b. → ehtimal {before}% əvəzinə {after}%",
+    "ai.veto": "⛔ AI bu seçimi blokladı — mənbəli xəbər əleyhinədir.",
+    "ai.failed": "ℹ️ Cavab vermədi: {labels}",
+    "ai.short": "   🤖 {items}",
+    "ai.note": "AI yalnız əyləcdir: ehtimalı azalda və ya mərci bloklaya bilər, artıra bilməz. Son qərarı sistemin hesablaması verir.",
+    "ai.record": "🤖 AI: {reviewed} seçimə baxıb, {vetoed} bloklayıb · bloklananlardan {lost} uduzdu, {won} qazandı · AI-ın təsiri: {effect} vahid",
     # Results of the system's picks
     "results.title": "📋 NƏTİCƏLƏR — SİSTEMİN SEÇİMLƏRİ",
     "results.bet": "{icon} {home} – {away} {score} · {pick} · {odds} → {pnl}",
@@ -645,10 +662,10 @@ MESSAGES: dict[str, str] = {
     "status.api_unavailable": "API sorğuları: məlum deyil ({reason})",
     "status.db": "Bazada: {matches} oyun · {teams} komanda · {odds} əmsal qeydi",
     "status.telegram": "Telegram: {value}",
-    "status.llm": "LLM analizi: {value}",
+    "status.llm": "AI rəyi: {value}",
     "status.enabled": "aktiv",
     "status.disabled": "deaktiv",
-    "status.llm_enabled_pending": "konfiqurasiyada aktivdir, analiz modulu hələ qoşulmayıb",
+    "status.llm_active": "aktivdir ({reviewers})",
     "status.next_run": "Növbəti planlı yükləmə: {value}",
     "status.not_scheduled": "planlaşdırılmayıb",
 
@@ -777,6 +794,15 @@ DASHBOARD: dict[str, str] = {
     "best_price_note": "Dəyər yalnız göstərilən bukmekerin əmsalında var. Daha aşağı əmsalla mərc etmək üstünlüyü aradan qaldırır.",
     "user_min_odds": "{bookmaker}-da minimum əmsal",
     "user_check": "Telegram-da yoxlayın",
+    "ai_title": "AI rəyi",
+    "ai_adjusted": "AI düzəlişi",
+    "ai_veto": "AI bu seçimi blokladı (mənbəli xəbər)",
+    "ai_failed": "Cavab vermədi",
+    "ai_record": "AI-ın təsiri",
+    "ai_reviewed": "Baxılan",
+    "ai_vetoed": "Bloklanan",
+    "ai_vetoed_lost": "Bloklananlardan uduzan",
+    "ai_effect": "Təsir (vahid)",
     "price_checks": "{bookmaker} yoxlamaları",
     "price_checks_empty": "Hələ yoxlama yoxdur. Telegram-da /misli_ID ƏMSAL yazın — sistem həmin əmsalı ədalətli qiymətlə müqayisə edir və yadda saxlayır.",
     "checks": "Yoxlama",

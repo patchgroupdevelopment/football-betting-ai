@@ -187,6 +187,17 @@ football-data.co.uk CSV (26 liqa, 4 mövsüm; keçmiş mövsümlər diskdə saxl
 - Məhdudiyyətlər (hesabatda yazılır): tarixi əmsallar yalnız 1X2, ÜST/ALT 2.5 və Asiya handikapı üçün var; zədə siyahıları yoxdur;
   üstünlük əsasən ən yaxşı əmsalı seçməkdən gəlir.
 
+## 7a2. AI rəyi (Mərhələ 4)
+
+`backend/llm/`: analizdən sonra, TOP seçimdən əvvəl ən yaxşı 5 BET namizədi Gemini (pulsuz, Google axtarışı ilə) və Claude
+(veb axtarışı ilə) ayrıca qiymətləndirir. Hər biri eyni faktları alır (`prompt.py`: forma, xG, cədvəl, zədələr, istirahət, H2H,
+əmsallar, sistemin səbəbləri) və bir JSON qaytarır: rəy, ±4 f.b. düzəliş, veto, xülasə, risklər, xəbərlər (Azərbaycanca).
+- Yalnız azaltma tətbiq olunur (rəylərin ortalaması); EV və qərar `scoring.decide` ilə yenidən hesablanır.
+- Veto yalnız veb mənbəli və heç bir AI "dəstəkləyir" demirsə keçərlidir; mənbəsiz xəbərlər atılır.
+- Cavablar 8 saat keşlənir (günorta analizi yenidən soruşmur); xəta/limit olan AI buraxılır.
+- `Prediction.llm_summary`: rəylər + `decision_before`, `rank_before`, `p_before` — AI-ın təsiri `results.ai_record` ilə ölçülür.
+LLM backtest edilmir (keçmişi "bilə" bilər); faydası canlı rejimdə bloklanan seçimlərin nəticəsi ilə ölçülür.
+
 ## 7b. Veb panel (Mərhələ 5)
 
 `backend/dashboard/` bazadan məlumatı toplayır (`collect.py`, bütün mətnlər `i18n/az.py`-dəki `DASHBOARD` lüğətindən) və
@@ -197,7 +208,7 @@ yerləşdirir. Açar və token səhifəyə heç vaxt düşmür (test ilə yoxlan
 
 | Mərhələ | Əsas işlər |
 |---|---|
-| 4 | LLM provayder interfeysi (Anthropic / OpenRouter), ciddi JSON sxemi, "BU MƏRC NİYƏ UDUZA BİLƏR?", tənqidçi keçidi, faktların yoxlanması; heyət və əmsal monitorinqi |
+| 4b | Heyət və əmsal monitorinqi (heyət açıqlananda yenidən qiymətləndirmə) |
 | 5+ | Paneldə "Mərc etdim" (real mərclərin qeydi), canlı yenilənmə |
 | 6 | VPS-ə deploy, həftəlik hesabat, backup |
 

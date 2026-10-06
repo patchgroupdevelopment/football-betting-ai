@@ -8,6 +8,8 @@ from datetime import date
 
 from backend.i18n import t
 from backend.i18n.az import (
+    AI_VERDICT_ICONS,
+    AI_VERDICTS,
     DATA_QUALITY_ICONS,
     DATA_QUALITY_LEVELS,
     DECISION_ICONS,
@@ -308,7 +310,8 @@ def format_status(status: SystemStatus) -> MessageBuilder:
         )
     )
     msg.line(t("status.telegram", value=t("status.enabled") if status.telegram_enabled else t("status.disabled")))
-    msg.line(t("status.llm", value=t("status.llm_enabled_pending") if status.llm_enabled else t("status.disabled")))
+    reviewers = ", ".join(status.llm_reviewers)
+    msg.line(t("status.llm", value=t("status.llm_active", reviewers=reviewers) if reviewers else t("status.disabled")))
     next_run = format_datetime(status.next_run_local) if status.next_run_local else t("status.not_scheduled")
     msg.line(t("status.next_run", value=next_run))
     return msg
@@ -407,6 +410,55 @@ def _pick_numbers(msg: MessageBuilder, view: PickView, user_bookmaker: str | Non
         )
 
 
+def _ai_section(msg: MessageBuilder, view: PickView) -> None:
+    ai = view.ai
+    if not ai or not (ai.get("reviews") or ai.get("failed")):
+        return
+    msg.section()
+    msg.line(bold(t("ai.title")))
+    reviews = ai.get("reviews") or []
+    for review in reviews:
+        msg.line(
+            t(
+                "ai.review",
+                icon=AI_VERDICT_ICONS.get(review["verdict"], ""),
+                label=review["label"],
+                verdict=AI_VERDICTS.get(review["verdict"], review["verdict"]),
+                summary=review.get("summary") or "—",
+            )
+        )
+    risks = [r for review in reviews for r in review.get("risks") or []][:4]
+    _bullets(msg, "ai.risks", risks)
+    news = [n for review in reviews for n in review.get("news") or []][:4]
+    _bullets(msg, "ai.news", news)
+    titles = [s.get("title") or s.get("url") for review in reviews for s in review.get("sources") or []]
+    if titles:
+        msg.line(t("ai.sources", sources=", ".join(dict.fromkeys(titles[:4]))))
+    if ai.get("veto"):
+        msg.blank()
+        msg.line(bold(t("ai.veto")))
+    elif ai.get("applied_pp") and ai.get("p_before") is not None and view.p_final is not None:
+        msg.line(
+            t(
+                "ai.adjusted",
+                pp=f"{ai['applied_pp']:+.1f}",
+                before=f"{ai['p_before'] * 100:.1f}",
+                after=f"{view.p_final * 100:.1f}",
+            )
+        )
+    if ai.get("failed"):
+        msg.line(t("ai.failed", labels=", ".join(ai["failed"])))
+    msg.line(t("ai.note"))
+
+
+def _ai_short(view: PickView) -> str | None:
+    reviews = (view.ai or {}).get("reviews") or []
+    if not reviews:
+        return None
+    items = " · ".join(f"{r['label']} {AI_VERDICT_ICONS.get(r['verdict'], '')}" for r in reviews)
+    return t("ai.short", items=items)
+
+
 def _bullets(msg: MessageBuilder, title_key: str, lines: Sequence[str]) -> None:
     if not lines:
         return
@@ -486,6 +538,9 @@ def _other_picks(msg: MessageBuilder, picks: Sequence[PickView], user_bookmaker:
                     example=_example_odds(view),
                 )
             )
+        short = _ai_short(view)
+        if short:
+            msg.line(short)
         msg.line(t("analysis.detail_link", match_id=view.match_id))
 
 
@@ -553,6 +608,7 @@ def format_daily_analysis(
         msg.blank()
         _pick_numbers(msg, best, user_bookmaker)
         _reasoning(msg, best)
+        _ai_section(msg, best)
         if len(analysis.picks) > 1:
             _other_picks(msg, analysis.picks[1:], user_bookmaker)
     else:
@@ -624,6 +680,7 @@ def format_match_detail(view: PickView | None, *, user_bookmaker: str | None = N
                 )
             )
     _reasoning(msg, view)
+    _ai_section(msg, view)
     return _append_disclaimer(msg)
 
 
@@ -642,5 +699,7 @@ def format_analysis_report(report: AnalysisReport) -> MessageBuilder:
         )
     )
     msg.line(t("analysis_run.model", matches=format_number(report.matches_used)))
+    if report.ai_reviewed:
+        msg.line(t("analysis_run.ai", reviewed=report.ai_reviewed, vetoed=report.ai_vetoed))
     _append_warnings(msg, report.warnings)
     return msg

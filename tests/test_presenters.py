@@ -119,7 +119,7 @@ def test_status_message_without_api_key():
     status = SystemStatus(
         paper_mode=True, last_run_date=None, last_run_status=None, last_run_finished_local=None, quota=None,
         quota_error="⚠️ FOOTBALL_API_KEY təyin edilməyib. Açarı .env faylına əlavə edin.",
-        matches=0, teams=0, odds=0, telegram_enabled=False, llm_enabled=False, next_run_local=None,
+        matches=0, teams=0, odds=0, telegram_enabled=False, llm_reviewers=(), next_run_local=None,
     )
     plain = format_status(status).render_plain()
     assert "Son yükləmə: hələ olmayıb" in plain
@@ -132,7 +132,7 @@ def test_status_message_with_quota():
         paper_mode=True, last_run_date=date(2026, 10, 5), last_run_status="success",
         last_run_finished_local=datetime(2026, 10, 5, 8, 3, tzinfo=TZ),
         quota=QuotaInfo(plan="Pro", used=87, limit=7500, remaining=7413), quota_error=None,
-        matches=1245, teams=312, odds=8940, telegram_enabled=True, llm_enabled=False,
+        matches=1245, teams=312, odds=8940, telegram_enabled=True, llm_reviewers=("Gemini", "Claude"),
         next_run_local=datetime(2026, 10, 6, 8, 0, tzinfo=TZ),
     )
     plain = format_status(status).render_plain()

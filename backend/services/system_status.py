@@ -40,8 +40,13 @@ class SystemStatus:
     teams: int
     odds: int
     telegram_enabled: bool
-    llm_enabled: bool
+    llm_reviewers: tuple[str, ...]
     next_run_local: datetime | None
+
+
+def _reviewers(container: AppContainer) -> tuple[str, ...]:
+    reviewer = container.ai_reviewer()
+    return tuple(reviewer.labels) if reviewer else ()
 
 
 def collect_status(container: AppContainer, next_run_local: datetime | None = None) -> SystemStatus:
@@ -77,6 +82,6 @@ def collect_status(container: AppContainer, next_run_local: datetime | None = No
         teams=teams,
         odds=odds,
         telegram_enabled=container.settings.telegram_configured,
-        llm_enabled=container.settings.llm_enabled,
+        llm_reviewers=_reviewers(container),
         next_run_local=next_run_local,
     )

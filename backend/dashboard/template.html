@@ -64,6 +64,10 @@ ul.reasons li { margin: 2px 0; }
 .user-min { background: var(--warn-soft); border-radius: 8px; padding: 6px 10px; margin: 4px 0 8px; font-size: 14px; }
 .user-min b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .user-min .note { margin: 0; }
+.ai { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 8px; font-size: 13px; }
+.ai-review { margin: 4px 0; }
+.ai a { color: var(--accent); text-decoration: none; }
+.ai-veto { color: var(--bad); font-weight: 700; margin-top: 6px; }
 .notice { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 16px; color: var(--muted); }
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -192,9 +196,26 @@ footer { margin-top: 36px; color: var(--muted); font-size: 12px; border-top: 1px
       D.user_bookmaker && p.min_odds ? el("div", { class: "user-min" },
         el("span", { text: L.user_min_odds.replace("{bookmaker}", D.user_bookmaker) + ": " }), el("b", { text: num(p.min_odds) }),
         el("span", { class: "note", text: " · " + L.user_check + ": /misli_" + p.match_id + " " + num(p.odds || p.min_odds) })) : null,
-      stats, why, against,
+      stats, why, against, aiBlock(p),
       el("div", { class: "note", text: L.best_price_note })
     );
+  }
+  function aiBlock(p) {
+    var ai = p.ai;
+    if (!ai) return null;
+    var box = el("div", { class: "ai" }, el("h3", { text: "🤖 " + L.ai_title }));
+    ai.reviews.forEach(function (r) {
+      box.appendChild(el("div", { class: "ai-review" }, el("strong", { text: r.label + ": " + r.verdict_label }), r.summary ? " — " + r.summary : ""));
+      var items = r.risks.concat(r.news);
+      if (items.length) box.appendChild(el("ul", { class: "reasons" }, items.map(function (x) { return el("li", { text: x }); })));
+      if (r.sources.length) box.appendChild(el("div", { class: "note" }, r.sources.slice(0, 4).map(function (s, i) {
+        return el("span", null, i ? " · " : "", el("a", { href: s.url, target: "_blank", rel: "noopener noreferrer", text: s.title || s.url }));
+      })));
+    });
+    if (ai.veto) box.appendChild(el("div", { class: "ai-veto", text: "⛔ " + L.ai_veto }));
+    else if (ai.applied_pp) box.appendChild(el("div", { class: "note", text: L.ai_adjusted + ": " + ai.applied_pp.toFixed(1) + " f.b. (" + pct(ai.p_before) + " → " + pct(p.p_final) + ")" }));
+    if (ai.failed.length) box.appendChild(el("div", { class: "note", text: L.ai_failed + ": " + ai.failed.join(", ") }));
+    return box;
   }
   function renderToday(root) {
     var t = D.today;
@@ -251,6 +272,14 @@ footer { margin-top: 36px; color: var(--muted); font-size: 12px; border-top: 1px
         kpi(L.gap_best, pct(pc.gap_best, true), null, cls(pc.gap_best)),
         kpi(L.passed_roi, pct(pc.passed_roi, true), pc.passed_bets + " " + L.bets.toLowerCase(), cls(pc.passed_roi)),
         kpi(L.all_roi, pct(pc.all_roi, true), pc.all_bets + " " + L.bets.toLowerCase(), cls(pc.all_roi))));
+    }
+    if (D.ai_record && D.ai_record.reviewed) {
+      var ar = D.ai_record;
+      root.appendChild(el("h2", { text: "🤖 " + L.ai_record }));
+      root.appendChild(el("div", { class: "grid kpis" },
+        kpi(L.ai_reviewed, String(ar.reviewed)), kpi(L.ai_vetoed, String(ar.vetoed)),
+        kpi(L.ai_vetoed_lost, ar.vetoed_lost + " / " + (ar.vetoed_lost + ar.vetoed_won)),
+        kpi(L.ai_effect, signed(ar.effect), null, cls(ar.effect))));
     }
     if (r.equity.length > 1) { root.appendChild(el("h2", { text: L.equity })); root.appendChild(lineChart(r.equity, L.profit)); }
     root.appendChild(el("h2", { text: L.settled }));

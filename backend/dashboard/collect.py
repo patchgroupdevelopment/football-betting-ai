@@ -15,7 +15,16 @@ from sqlalchemy.orm import joinedload
 from backend.backtest.service import latest_report
 from backend.config import AppConfig
 from backend.database.session import Database
-from backend.i18n.az import DASHBOARD, DECISION_ICONS, DECISIONS, MARKETS, PYRAMID_MODES, RISK_LEVELS
+from backend.i18n.az import (
+    AI_VERDICT_ICONS,
+    AI_VERDICTS,
+    DASHBOARD,
+    DECISION_ICONS,
+    DECISIONS,
+    MARKETS,
+    PYRAMID_MODES,
+    RISK_LEVELS,
+)
 from backend.models import Bet, Match, ModelRun, OddsSnapshot, Prediction, PyramidStage, Team
 from backend.models.constants import BetStatus, Decision
 from backend.presenters.formatters import min_odds
@@ -23,7 +32,7 @@ from backend.presenters.labels import reasons_text, selection_label
 from backend.services.picks import PickView, day_predictions
 from backend.services.price_checks import bookmaker_stats
 from backend.services.pyramid import PyramidService
-from backend.services.results import TrackRecord, track_record
+from backend.services.results import TrackRecord, ai_record, track_record
 from backend.services.runs import RUN_KIND_ANALYSIS, RUN_KIND_DAILY
 from backend.utils.formatting import format_date, format_date_with_weekday, format_datetime, format_time
 from backend.utils.timeutils import local_now, to_local
@@ -39,6 +48,30 @@ BET_STATUS = {
 
 def _pct(value: float | None, digits: int = 1) -> float | None:
     return None if value is None else round(value * 100, digits)
+
+
+def _ai(view: PickView) -> dict[str, Any] | None:
+    ai = view.ai
+    if not ai or not (ai.get("reviews") or ai.get("failed")):
+        return None
+    return {
+        "reviews": [
+            {
+                "label": r["label"],
+                "verdict": r["verdict"],
+                "verdict_label": f"{AI_VERDICT_ICONS.get(r['verdict'], '')} {AI_VERDICTS.get(r['verdict'], r['verdict'])}",
+                "summary": r.get("summary") or "",
+                "risks": r.get("risks") or [],
+                "news": r.get("news") or [],
+                "sources": r.get("sources") or [],
+            }
+            for r in ai.get("reviews") or []
+        ],
+        "applied_pp": ai.get("applied_pp") or 0,
+        "p_before": _pct(ai.get("p_before")),
+        "veto": bool(ai.get("veto")),
+        "failed": ai.get("failed") or [],
+    }
 
 
 def _pick(view: PickView) -> dict[str, Any]:
@@ -62,6 +95,7 @@ def _pick(view: PickView) -> dict[str, Any]:
         "p_model": _pct(view.p_model),
         "fair_odds": round(view.fair_odds, 2) if view.fair_odds else None,
         "min_odds": min_odds(view) if has else None,
+        "ai": _ai(view),
         "ev": _pct(view.ev),
         "confidence": view.confidence,
         "risk": view.risk,
@@ -164,6 +198,17 @@ def _prices(db: Database, config: AppConfig) -> dict[str, Any] | None:
     }
 
 
+def _ai_record(db: Database) -> dict[str, Any]:
+    record = ai_record(db)
+    return {
+        "reviewed": record.reviewed,
+        "vetoed": record.vetoed,
+        "vetoed_lost": record.vetoed_lost,
+        "vetoed_won": record.vetoed_won,
+        "effect": record.effect,
+    }
+
+
 def _pyramid(db: Database, config: AppConfig) -> dict[str, Any]:
     service = PyramidService(db, config.bankroll)
     state = service.get_state()
@@ -239,6 +284,7 @@ def collect(db: Database, config: AppConfig, tz: ZoneInfo, day: date, *, paper_m
         "today": _today(db, day, tz),
         "results": _results(db, day, tz),
         "prices": _prices(db, config),
+        "ai_record": _ai_record(db),
         "pyramid": _pyramid(db, config),
         "backtest": _backtest(db),
         "system": _system(db, tz),

@@ -195,6 +195,54 @@ class ResultsService:
 
 
 @dataclass(frozen=True)
+class AiRecord:
+    """What the AI brake did: picks it blocked and how those matches actually ended."""
+
+    reviewed: int
+    vetoed: int
+    vetoed_won: int  # blocked, but would have won (cost)
+    vetoed_lost: int  # blocked and would have lost (saved)
+    effect: float  # units saved (+) or lost (−) by the blocks, at the best price
+
+
+def ai_record(db: Database) -> AiRecord:
+    with db.session() as session:
+        rows = list(
+            session.scalars(
+                select(Prediction)
+                .options(joinedload(Prediction.match))
+                .where(Prediction.llm_summary.is_not(None))
+                .order_by(Prediction.id)
+            )
+        )
+        latest: dict[tuple[int, date | None], Prediction] = {}
+        for prediction in rows:
+            latest[(prediction.match_id, prediction.run_date)] = prediction
+        reviewed = vetoed = won = lost = 0
+        effect = 0.0
+        for prediction in latest.values():
+            summary = prediction.llm_summary or {}
+            if not summary.get("reviews"):
+                continue
+            reviewed += 1
+            blocked = summary.get("decision_before") == "bet" and prediction.decision != "bet"
+            if not blocked:
+                continue
+            vetoed += 1
+            match = prediction.match
+            if match.status not in FINISHED_STATUSES or match.home_goals is None or not prediction.best_odds:
+                continue
+            result = session.scalar(select(Result).where(Result.match_id == match.id))
+            outcome = settle(prediction.market, prediction.selection, prediction.line, final_score(match, result))
+            if outcome is None:
+                continue
+            won += outcome == "win"
+            lost += outcome == "loss"
+            effect -= profit(outcome, prediction.best_odds)
+    return AiRecord(reviewed, vetoed, won, lost, round(effect, 2))
+
+
+@dataclass(frozen=True)
 class TrackRecord:
     bets: int
     wins: int

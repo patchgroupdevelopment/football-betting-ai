@@ -44,6 +44,7 @@ class PickView:
     kickoff_local: datetime
     status: str
     reasons: dict[str, Any] = field(default_factory=dict)
+    ai: dict[str, Any] | None = None  # AI reviewers' opinions (Prediction.llm_summary)
 
     @property
     def has_candidate(self) -> bool:
@@ -91,6 +92,7 @@ def _view(prediction: Prediction, tz: ZoneInfo) -> PickView:
         kickoff_local=to_local(match.kickoff_utc, tz),
         status=match.status,
         reasons=prediction.reasons or {},
+        ai=prediction.llm_summary,
     )
 
 

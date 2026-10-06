@@ -4,6 +4,10 @@ Runs after ingestion. Predictions are kept as history (one row per match per
 run); readers take the latest row per match. The day's top picks are also
 recorded as paper bets (stake 1 unit) so that results and ROI can be tracked
 from the first day, whether or not a real bet is placed.
+
+With AI review on, the best picks get a second opinion (``backend.llm.review``) before the
+day's TOP selection; the AI can only lower a probability or veto with sources. Both the
+model-only and the final decision are stored (``Prediction.llm_summary``) to measure its effect.
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ from backend.analyzers.team_history import load_finished_matches
 from backend.config import AppConfig
 from backend.database.session import Database
 from backend.i18n import t
+from backend.llm.review import AiReviewService, AiVerdict, apply_verdict
 from backend.models import Bet, Match, ModelRun, Prediction, Result, Team, TeamRating
 from backend.models.constants import NOT_STARTED_STATUSES, BetStatus, Decision, RunStatus
 from backend.predictors.model import FittedModels, fit_models, global_cards_average
@@ -46,6 +51,8 @@ class AnalysisReport:
     pick_prediction_ids: list[int] = field(default_factory=list)
     matches_used: int = 0
     warnings: list[str] = field(default_factory=list)
+    ai_reviewed: int = 0
+    ai_vetoed: int = 0
 
 
 def _candidate_summary(evaluation: MatchEvaluation) -> list[dict]:
@@ -66,6 +73,20 @@ def _candidate_summary(evaluation: MatchEvaluation) -> list[dict]:
         }
         for e in evaluation.candidates[:STORED_CANDIDATES]
     ]
+
+
+def _ai_summary(verdict: AiVerdict | None, before: MatchEvaluation, model_rank: int | None) -> dict | None:
+    """What the AI said, plus the model-only decision, so its effect can be measured later."""
+    if verdict is None:
+        return None
+    best = before.best
+    return {
+        **verdict.to_dict(),
+        "decision_before": str(before.decision),
+        "rank_before": model_rank,
+        "p_before": round(best.candidate.p_final, 4) if best else None,
+        "ev_before": round(best.candidate.ev, 4) if best else None,
+    }
 
 
 def _reasons_payload(evaluation: MatchEvaluation) -> dict:
@@ -95,9 +116,16 @@ def _reasons_payload(evaluation: MatchEvaluation) -> dict:
 
 class AnalysisService:
     def __init__(
-        self, db: Database, config: AppConfig, tz: ZoneInfo, *, clock: Callable[[], datetime] = utcnow
+        self,
+        db: Database,
+        config: AppConfig,
+        tz: ZoneInfo,
+        *,
+        clock: Callable[[], datetime] = utcnow,
+        reviewer: AiReviewService | None = None,
     ) -> None:
         self._db = db
+        self._reviewer = reviewer
         self._config = config
         self._tz = tz
         self._clock = clock
@@ -122,20 +150,28 @@ class AnalysisService:
                         t("analysis_run.match_failed", match=f"{match.home_team.name} – {match.away_team.name}")
                     )
 
-        top = select_top(evaluations, self._config.selection.max_daily_picks)
+        max_picks = self._config.selection.max_daily_picks
+        model_ranks = {id(e): rank for rank, e in enumerate(select_top(evaluations, max_picks), start=1)}
+        verdicts = self._review(evaluations, report)
+        final = [
+            (apply_verdict(e, verdicts[id(e)], self._config.selection) if id(e) in verdicts else e, e)
+            for e in evaluations
+        ]
+        top = select_top([f for f, _ in final], max_picks)
         ranks = {id(e): rank for rank, e in enumerate(top, start=1)}
         picks: list[tuple[int, int]] = []
         with self._db.session() as session:
-            for evaluation in evaluations:
-                prediction = self._store_prediction(session, evaluation, target_date, ranks.get(id(evaluation)))
+            for evaluation, before in final:
+                ai = _ai_summary(verdicts.get(id(before)), before, model_ranks.get(id(before)))
+                prediction = self._store_prediction(session, evaluation, target_date, ranks.get(id(evaluation)), ai)
                 if prediction.rank is not None:
                     picks.append((prediction.rank, prediction.id))
                     self._record_paper_bet(session, prediction)
         report.pick_prediction_ids = [prediction_id for _, prediction_id in sorted(picks)]
 
         report.analyzed = len(evaluations)
-        report.bets = sum(1 for e in evaluations if e.decision == Decision.BET)
-        report.watch = sum(1 for e in evaluations if e.decision == Decision.WATCH)
+        report.bets = sum(1 for e, _ in final if e.decision == Decision.BET)
+        report.watch = sum(1 for e, _ in final if e.decision == Decision.WATCH)
         report.no_bet = report.analyzed - report.bets - report.watch
         self._record_run(target_date, started, report)
         logger.info(
@@ -145,6 +181,20 @@ class AnalysisService:
         return report
 
     # ---------------------------------------------------------------- steps
+
+    def _review(self, evaluations: list[MatchEvaluation], report: AnalysisReport) -> dict[int, AiVerdict]:
+        """AI second opinion on the best BET candidates (more than the TOP, in case one is vetoed)."""
+        if self._reviewer is None:
+            return {}
+        candidates = select_top(evaluations, self._reviewer.max_reviews)
+        try:
+            verdicts = self._reviewer.review_many(candidates)
+        except Exception:
+            logger.exception("AI rəyi mərhələsində xəta")
+            return {}
+        report.ai_reviewed = sum(1 for v in verdicts.values() if v.reviews)
+        report.ai_vetoed = sum(1 for v in verdicts.values() if v.veto)
+        return verdicts
 
     def _fit(self, session: Session, now: datetime) -> FittedModels:
         since = now - timedelta(days=self._config.model.fit_window_days)
@@ -178,7 +228,7 @@ class AnalysisService:
         )
 
     def _store_prediction(
-        self, session: Session, evaluation: MatchEvaluation, day: date, rank: int | None
+        self, session: Session, evaluation: MatchEvaluation, day: date, rank: int | None, ai: dict | None = None
     ) -> Prediction:
         best = evaluation.best
         candidate = best.candidate if best else None
@@ -201,6 +251,7 @@ class AnalysisService:
             risk_level=best.risk if best else None,
             decision=evaluation.decision,
             reasons=_reasons_payload(evaluation),
+            llm_summary=ai,
             model_version=self._config.model.version,
         )
         session.add(prediction)

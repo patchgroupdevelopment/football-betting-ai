@@ -34,7 +34,7 @@ from backend.presenters.results import format_track_record
 from backend.services.overview import build_daily_overview
 from backend.services.picks import get_match_analysis
 from backend.services.price_checks import bookmaker_stats, record_check
-from backend.services.results import track_record
+from backend.services.results import ai_record, track_record
 from backend.services.system_status import collect_status
 from backend.services.users import register_user
 from backend.utils.timeutils import local_now, local_today
@@ -114,6 +114,7 @@ def track_record_message(container: AppContainer) -> MessageBuilder:
         bookmaker_stats(container.db, container.config.selection.user_bookmaker)
         if container.config.selection.user_bookmaker
         else None,
+        ai_record(container.db),
     )
 
 

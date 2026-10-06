@@ -95,6 +95,20 @@ external_data:
   football_data_couk:
     seasons_back: 1                   # cari mövsümdən əlavə neçə keçmiş mövsüm yüklənsin
 
+# AI rəyi: günün seçimlərinə Gemini (pulsuz) və Claude ayrıca baxır, son xəbərləri axtarır.
+# AI yalnız əyləcdir: ehtimalı ən çox llm_max_adjustment_pp qədər AZALDA bilər, mənbəli xəbərlə veto edə bilər;
+# EV və qərarı yenə sistem hesablayır. Açarlar .env / GitHub Secrets-də: GEMINI_API_KEY, CLAUDE_API_KEY.
+llm:
+  enabled: true
+  reviewers: [gemini, anthropic]      # açarı olanlar işləyir
+  gemini_model: gemini-2.5-flash      # pulsuz planda mövcud olan model
+  anthropic_model: claude-sonnet-5-5  # daha güclü: claude-opus-5-5 (bahadır), daha ucuz: claude-haiku-4-5
+  web_search: true                    # son xəbərləri axtarsın (mənbə linkləri ilə)
+  max_searches: 3                     # Claude üçün bir seçimdə maksimum axtarış
+  max_reviews: 5                      # bir analizdə ən çox neçə seçimə baxılır
+  cache_hours: 8                      # eyni seçim bu müddətdə yenidən soruşulmur
+  timeout_seconds: 120
+
 # Liqalar prioritet sırası ilə (yuxarıdakı daha vacibdir).
 # ID-ləri yoxlamaq üçün:
 #   python -m backend.cli leagues --check
