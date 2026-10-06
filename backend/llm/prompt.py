@@ -28,7 +28,8 @@ Rules:
 - "adjustment_pp": your change to the probability of the selection, in percentage points, between -{max_pp} and
   +{max_pp}. Use 0 when nothing material changes the picture.
 - Nobody can guarantee a result: never claim certainty.
-- Write "summary", "risks" and "news" in Azerbaijani (Latin script), short and concrete.
+- Write "summary", "risks" and "news" in Azerbaijani (Latin script), short and concrete. Keep team, player and
+  coach names exactly as spelled in the facts or the source (do not transliterate them).
 
 Answer with ONE JSON object and nothing else (no markdown):
 {{"verdict": "support" | "neutral" | "against", "adjustment_pp": number, "veto": true | false,
