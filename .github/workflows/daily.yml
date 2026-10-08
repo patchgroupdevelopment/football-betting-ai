@@ -3,23 +3,55 @@ name: Gündəlik analiz
 # 08:00 Bakı: yükləmə + nəticələrin hesablanması + analiz + Telegram mesajı.
 # 15:00 Bakı: təzə əmsal və zədələrlə yeniləmə (səhər mesajı göndərilməyibsə, bu iş göndərir).
 # Hər işdən sonra veb panel (GitHub Pages) yenilənir.
+#
+# GitHub planlı işləri bəzən saatlarla gecikdirir. Ona görə hər vaxt üçün bir neçə ehtiyat cədvəl var
+# (saat başından uzaq dəqiqələrdə) və "guard" addımı eyni vaxt üçün ikinci işi buraxır.
+# Bot işi də gündəlik iş gecikəndə onu əl ilə başladır (scripts/watchdog.sh).
 on:
   schedule:
-    - cron: "0 4 * * *"
-    - cron: "0 11 * * *"
+    - cron: "7 4 * * *"
+    - cron: "37 4 * * *"
+    - cron: "11 5 * * *"
+    - cron: "7 11 * * *"
+    - cron: "37 11 * * *"
+    - cron: "11 12 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: daily
   cancel-in-progress: false
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.guard.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - name: Bu vaxt üçün iş artıq gedibmi?
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            bash scripts/watchdog.sh guard
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   run:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

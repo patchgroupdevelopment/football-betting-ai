@@ -1,14 +1,16 @@
 name: Telegram əmrləri
 
-# Hər 15 dəqiqədən bir gözləyən Telegram mesajlarına cavab verir.
-# Mesaj yoxdursa iş ilk addımda (bir neçə saniyəyə) bitir.
+# Hər 15 dəqiqədən bir gözləyən Telegram mesajlarına cavab verir (GitHub bunu tez-tez gecikdirir).
+# Mesaj yoxdursa iş bir neçə saniyəyə bitir. Hər işdə gözətçi də var: gündəlik analiz gecikibsə,
+# onu əl ilə başladır (scripts/watchdog.sh) — əl ilə başladılan iş növbə gözləmir.
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: bot
@@ -28,6 +30,14 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PYTHONUTF8: "1"
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Gündəlik analiz gecikibsə, başlat
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/watchdog.sh dispatch
+
       - name: Yeni mesaj varmı?
         id: check
         run: |
@@ -37,9 +47,6 @@ jobs:
             echo "pending=false" >> "$GITHUB_OUTPUT"
             echo "Gözləyən mesaj yoxdur"
           fi
-
-      - if: steps.check.outputs.pending == 'true'
-        uses: actions/checkout@v4
 
       - if: steps.check.outputs.pending == 'true'
         uses: actions/setup-python@v5
